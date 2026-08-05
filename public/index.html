@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Brisio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f6fbff;
+      --surface: #ffffff;
+      --surface-soft: #f7fafc;
+      --text: #1a2331;
+      --muted: #667487;
+      --border: #dce4ec;
+      --brand: #117a8b;
+      --brand-strong: #0f5f78;
+      --accent: #e06f3a;
+      --org: #2e5fb1;
+      --business: #247251;
+      --shadow: 0 14px 30px rgba(19, 45, 70, 0.08);
+      --radius-lg: 18px;
+      --radius-md: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Inter", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      position: relative;
+      letter-spacing: 0;
+      background-image: linear-gradient(145deg, #f6fbff 0%, #fef9f3 45%, #f4fbf8 100%);
+      overflow-x: hidden;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      border-radius: 999px;
+      z-index: -1;
+      pointer-events: none;
+      filter: blur(2px);
+    }
+
+    body::before {
+      width: 320px;
+      height: 320px;
+      top: -110px;
+      right: -90px;
+      background: radial-gradient(circle, rgba(61, 170, 193, 0.2) 0%, rgba(61, 170, 193, 0) 72%);
+    }
+
+    body::after {
+      width: 340px;
+      height: 340px;
+      bottom: -140px;
+      left: -120px;
+      background: radial-gradient(circle, rgba(234, 146, 88, 0.18) 0%, rgba(234, 146, 88, 0) 72%);
+    }
+
+    h1,
+    h2,
+    h3 {
+      font-family: "Space Grotesk", "Inter", sans-serif;
+      letter-spacing: -0.02em;
+    }
+
+    .app {
+      width: min(100%, 440px);
+      margin: 0 auto;
+      padding: 14px 10px 32px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.94);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(3px);
+      animation: rise 420ms ease-out both;
+    }
+
+    .card:nth-child(2) { animation-delay: 40ms; }
+    .card:nth-child(3) { animation-delay: 80ms; }
+    .card:nth-child(4) { animation-delay: 120ms; }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .bridge-emblem {
+      width: 58px;
+      height: 58px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      padding: 7px;
+      background: linear-gradient(150deg, #f9fdff, #edf7ff 55%, #fff6ee);
+      border: 1px solid #d3e3f0;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.95), 0 10px 22px rgba(24, 66, 101, 0.11);
+    }
+
+    .bridge-emblem svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .brand-wordmark {
+      display: inline-block;
+      font-family: "Space Grotesk", "Inter", sans-serif;
+      font-size: 1.22rem;
+      line-height: 1.1;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #1a3147;
+      white-space: nowrap;
+    }
+
+    .cg-monogram {
+      font-family: "Space Grotesk", "Inter", sans-serif;
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 800;
+      color: #214969;
+    }
+
+    .brand-stack {
+      display: grid;
+      gap: 2px;
+    }
+
+    .brand {
+      margin: 0;
+      font-size: 1.22rem;
+      line-height: 1.1;
+      font-weight: 800;
+    }
+
+    .brand-sub {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.015em;
+      font-weight: 600;
+    }
+
+    .muted { color: var(--muted); }
+    .small { font-size: 12px; }
+    .row { display: grid; gap: 10px; }
+    .two,
+    .three { grid-template-columns: 1fr; }
+
+    @media (min-width: 900px) {
+      .two { grid-template-columns: 1fr 1fr; }
+      .three { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    label {
+      color: #44596d;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    input,
+    select,
+    textarea,
+    button {
+      font: inherit;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--surface-soft);
+      padding: 11px 12px;
+      color: var(--text);
+      transition: border-color 180ms ease, box-shadow 180ms ease, transform 140ms ease;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #89b8c4;
+      box-shadow: 0 0 0 4px rgba(17, 122, 139, 0.14);
+    }
+
+    textarea { min-height: 90px; resize: vertical; }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 11px 18px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: transform 140ms ease, box-shadow 200ms ease, background 200ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    .btn {
+      background: linear-gradient(130deg, var(--brand), var(--brand-strong));
+      color: #fff;
+      box-shadow: 0 10px 18px rgba(17, 122, 139, 0.24);
+    }
+
+    .btn-alt {
+      background: #eef3f8;
+      color: var(--text);
+    }
+
+    .btn-mini { padding: 6px 10px; font-size: 12px; margin-right: 6px; margin-bottom: 6px; }
+
+    .btn-chip {
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .btn-chip.active {
+      background: linear-gradient(130deg, #1e8797, #1b6f99);
+      color: #fff;
+      border-color: #1d7898;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 6px 11px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .role-business { background: #e5f2eb; color: var(--business); }
+    .role-organization { background: #e7edf9; color: var(--org); }
+
+    .listing {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 13px;
+      display: grid;
+      gap: 6px;
+      margin-bottom: 10px;
+      background: #fff;
+      cursor: pointer;
+      transition: transform 140ms ease, border-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .listing:hover {
+      transform: translateY(-1px);
+      border-color: #b7c8d8;
+      box-shadow: 0 10px 18px rgba(21, 49, 76, 0.08);
+    }
+
+    .listing.active {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 1px rgba(17, 122, 139, 0.12), 0 12px 24px rgba(17, 122, 139, 0.1);
+    }
+
+    .badge {
+      background: #eaf1f8;
+      color: #284058;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .private { background: #f6e7dd; color: #9b4c1c; }
+    .hidden { display: none; }
+
+    .result {
+      border: 1px solid var(--border);
+      padding: 12px 14px;
+      margin-top: 10px;
+      background: #f8fcff;
+      border-radius: 12px;
+    }
+
+    .message { margin-top: 6px; color: var(--accent); }
+
+    .screen-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 14px 0 6px;
+    }
+
+    .screen-chip {
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .screen-chip.active {
+      background: linear-gradient(130deg, #1e8797, #1b6f99);
+      color: #fff;
+      border-color: #1d7898;
+    }
+
+    .section-stack {
+      display: grid;
+      gap: 14px;
+      margin-top: 14px;
+    }
+
+    .overview-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1fr;
+    }
+
+    @media (min-width: 900px) {
+      .overview-grid { grid-template-columns: 1.1fr 0.9fr; }
+    }
+
+    .quick-panel {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+
+    .step-card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      background: linear-gradient(160deg, #ffffff, #f8fcff);
+      display: grid;
+      gap: 8px;
+    }
+
+    .hero {
+      background: linear-gradient(140deg, #ffffff, #f5fbff 58%, #fff8f2 100%);
+    }
+
+    .hero h1, .hero h2 { margin: 0 0 10px; }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .soft-list {
+      margin: 12px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+    }
+
+    .board-shell {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1fr;
+    }
+
+    @media (min-width: 980px) {
+      .board-shell { grid-template-columns: 1fr 1.08fr; }
+    }
+
+    .board-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 10px 0 14px;
+    }
+
+    .listing-detail {
+      border: 1px solid var(--border);
+      background: linear-gradient(145deg, #fcfeff, #f0f8ff);
+      color: var(--text);
+      border-radius: 16px;
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .listing-detail .detail-box {
+      background: #ffffff;
+      border-color: #dce4ec;
+      color: var(--text);
+    }
+
+    .listing-detail .detail-box .small,
+    .listing-detail .detail-box .muted,
+    .listing-detail .small.muted {
+      color: var(--muted);
+    }
+
+    .listing-detail .badge,
+    .listing-detail .status-badge {
+      background: #eaf1f8;
+      color: #27435d;
+    }
+    .dashboard-grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: 1fr;
+    }
+
+    @media (min-width: 900px) {
+      .dashboard-grid { grid-template-columns: 1.2fr 0.8fr; }
+    }
+
+    .stat-strip {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: 1fr;
+    }
+
+    @media (min-width: 760px) {
+      .stat-strip { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    .stat-tile {
+      background: linear-gradient(160deg, #f4fbff, #fff);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .stat-tile strong {
+      font-size: 1.35rem;
+      font-family: "Space Grotesk", "Inter", sans-serif;
+      color: #1b3852;
+    }
+
+    .detail-grid {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 760px) {
+      .detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .detail-box {
+      background: #f8fbff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #e7f4ef;
+      color: #245f47;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: capitalize;
+    }
+    .message-thread {
+      display: grid;
+      gap: 8px;
+      margin: 10px 0;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .message-bubble {
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #f8fbff;
+      padding: 10px 12px;
+    }
+
+    .inline-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .textarea-sm { min-height: 70px; }
+    .chat-log {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fafdff;
+      max-height: 280px;
+      overflow-y: auto;
+      display: grid;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .chat-item {
+      border-radius: 10px;
+      padding: 8px 10px;
+      max-width: 90%;
+      line-height: 1.4;
+    }
+
+    .chat-user {
+      background: #e5f3f7;
+      margin-left: auto;
+    }
+
+    .chat-assistant { background: #f6f7fb; }
+
+    .brand-line {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+      text-align: right;
+    }
+
+    @media (max-width: 700px) {
+      .brand-line {
+        text-align: left;
+        width: 100%;
+      }
+
+      .topbar {
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="card topbar">
+      <div class="brand-wrap">
+        <div class="bridge-emblem" aria-hidden="true">
+          <svg viewBox="0 0 88 88" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="44" cy="24" r="10" fill="#FFD88A" />
+            <path d="M17 49C23 38 32 33 44 33C56 33 65 38 71 49" stroke="#2F8EAD" stroke-width="5.6" stroke-linecap="round" />
+            <rect x="14" y="49" width="60" height="8" rx="4" fill="#1D4F73" />
+            <line x1="28" y1="49" x2="28" y2="41" stroke="#1D4F73" stroke-width="3.1" stroke-linecap="round" />
+            <line x1="44" y1="49" x2="44" y2="39" stroke="#1D4F73" stroke-width="3.1" stroke-linecap="round" />
+            <line x1="60" y1="49" x2="60" y2="41" stroke="#1D4F73" stroke-width="3.1" stroke-linecap="round" />
+            <path d="M20 63H68" stroke="#5CB9C7" stroke-width="3" stroke-linecap="round" />
+            <path d="M24 69H64" stroke="#E78C55" stroke-width="2.4" stroke-linecap="round" opacity="0.95" />
+          </svg>
+        </div>
+        <div class="brand-stack">
+          <h1 class="brand">
+            <span class="brand-wordmark">Brisio</span>
+          </h1>
+          <div class="brand-sub">Bridging resources. Strengthening communities.</div>
+        </div>
+      </div>
+      <div id="userLine" class="brand-line">Bridging resources. Strengthening communities.</div>
+    </div>
+    <div id="root"></div>
+  </div>
+
+  <script>
+    const state = {
+      token: localStorage.getItem('cg-token') || '',
+      user: null,
+      authMode: 'login',
+      listings: [],
+      stats: null,
+      organizations: [],
+      aiInsights: null,
+      engagements: [],
+      bestMatch: null,
+      view: 'loading',
+      dashboardSection: 'overview',
+      message: '',
+      listingFilter: 'all',
+      selectedListingId: '',
+      legacyMatches: [],
+      chatHistory: [],
+      lastChatReply: null
+    };
+
+    const root = document.getElementById('root');
+    const userLine = document.getElementById('userLine');
+
+    function setMessage(text) {
+      state.message = text || '';
+      render();
+    }
+
+    function escapeHtml(text) {
+      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+      return String(text || '').replace(/[&<>"']/g, (m) => map[m]);
+    }
+
+    async function api(url, options = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      if (state.token) headers.Authorization = `Bearer ${state.token}`;
+      const res = await fetch(url, { ...options, headers });
+      const data = await res.json();
+      if (res.status === 401) {
+        localStorage.removeItem('cg-token');
+        state.token = '';
+        state.user = null;
+        state.view = 'auth';
+        render();
+      }
+      return data;
+    }
+
+    async function boot() {
+      if (state.token) {
+        const me = await api('/api/auth/me');
+        if (me.success) state.user = me.user;
+      }
+      state.view = state.user ? 'dashboard' : 'auth';
+      if (state.user) await refreshData();
+      render();
+    }
+
+    async function refreshData() {
+      const [listingsRes, statsRes, insightsRes, engagementsRes] = await Promise.all([
+        api('/api/listings'),
+        api('/api/stats'),
+        api('/api/ai-insights'),
+        api('/api/engagements')
+      ]);
+      state.listings = listingsRes.listings || [];
+      state.stats = statsRes.stats || null;
+      state.aiInsights = insightsRes.insights || null;
+      state.engagements = engagementsRes.engagements || [];
+      if (!state.selectedListingId || !state.listings.some((listing) => listing.id === state.selectedListingId)) {
+        state.selectedListingId = state.listings[0] ? state.listings[0].id : '';
+      }
+
+      if (state.user && state.user.role === 'business') {
+        const orgsRes = await api('/api/organizations');
+        state.organizations = orgsRes.organizations || [];
+      }
+
+      if (state.chatHistory.length === 0) {
+        pushChat('assistant', 'Welcome back. Share what you can or find what you need, and I will suggest the best current matches.', [
+          { id: 'share', text: 'Share what you can' },
+          { id: 'find', text: 'Find what you need' },
+          { id: 'show_urgent', text: 'Show urgent listings' }
+        ]);
+      }
+    }
+
+    function logout() {
+      if (state.token) api('/api/auth/logout', { method: 'POST' }).catch(() => {});
+      localStorage.removeItem('cg-token');
+      state.token = '';
+      state.user = null;
+      state.listings = [];
+      state.stats = null;
+      state.aiInsights = null;
+      state.engagements = [];
+      state.organizations = [];
+      state.bestMatch = null;
+      state.dashboardSection = 'overview';
+      state.listingFilter = 'all';
+      state.selectedListingId = '';
+      state.legacyMatches = [];
+      state.chatHistory = [];
+      state.lastChatReply = null;
+      state.view = 'auth';
+      render();
+    }
+
+    function setAuthMode(mode) {
+      state.authMode = mode === 'register' ? 'register' : 'login';
+      state.message = '';
+      render();
+    }
+
+    function roleLabel(role) {
+      if (role === 'organization') return 'nonprofit';
+      return role || '';
+    }
+
+    function getFieldValue(id) {
+      const el = document.getElementById(id);
+      return el ? String(el.value || '').trim() : '';
+    }
+
+    function formatAddress(street, city, stateCode, zip) {
+      return [street, city, stateCode, zip].filter(Boolean).join(', ');
+    }
+
+    async function submitAuth() {
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value;
+
+      if (!email || !password) {
+        return setMessage('Please complete all required fields.');
+      }
+
+      let res;
+      if (state.authMode === 'register') {
+        const role = document.getElementById('authRole').value;
+        const name = document.getElementById('authName').value.trim();
+        const organizationName = document.getElementById('authOrganizationName').value.trim();
+        const authStreet = getFieldValue('authStreet');
+        const authCity = getFieldValue('authCity');
+        const authState = getFieldValue('authState');
+        const authZip = getFieldValue('authZip');
+        const location = formatAddress(authStreet, authCity, authState, authZip);
+
+        if (!role || !name || !authStreet || !authCity || !authState || !authZip) {
+          return setMessage('Please complete all required fields.');
+        }
+
+        res = await api('/api/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({
+            email,
+            password,
+            role,
+            name,
+            organizationName: organizationName || name,
+            location
+          })
+        });
+      } else {
+        res = await api('/api/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password })
+        });
+      }
+
+      if (!res.success) return setMessage(res.error || (state.authMode === 'register' ? 'Registration failed.' : 'Sign in failed.'));
+
+      state.token = res.token;
+      localStorage.setItem('cg-token', res.token);
+      state.user = res.user;
+      state.view = 'dashboard';
+      state.message = '';
+      await refreshData();
+      await runQuickRecommend();
+      render();
+    }
+
+    async function submitListing() {
+      const payload = {
+        category: document.getElementById('listingCategory').value,
+        description: document.getElementById('listingDescription').value.trim(),
+        contact: document.getElementById('listingContact').value.trim(),
+        location: formatAddress(
+          getFieldValue('listingStreet'),
+          getFieldValue('listingCity'),
+          getFieldValue('listingState'),
+          getFieldValue('listingZip')
+        ),
+        resourceName: document.getElementById('listingResourceName').value.trim(),
+        resourceType: document.getElementById('listingResourceType').value.trim(),
+        quantity: document.getElementById('listingQuantity').value.trim(),
+        availabilityNotes: document.getElementById('listingAvailabilityNotes').value.trim()
+      };
+
+      if (!payload.location) {
+        return setMessage('Please provide street, city, state, and ZIP code.');
+      }
+
+      if (state.user.role === 'business') {
+        payload.deliverWithinHours = document.getElementById('listingDelivery').value;
+        payload.offerClosesAt = document.getElementById('listingClose').value;
+        const target = document.getElementById('listingPrivateTarget').value;
+        if (target) {
+          payload.isPrivate = true;
+          payload.targetOrganizationId = target;
+        }
+      } else {
+        payload.urgencyLevel = document.getElementById('listingUrgency').value;
+      }
+
+      const res = await api('/api/listings', { method: 'POST', body: JSON.stringify(payload) });
+      if (!res.success) return setMessage(res.error || 'Could not post listing.');
+
+      await refreshData();
+      setMessage('Listing posted.');
+    }
+
+    async function submitPrivateOffer() {
+      const payload = {
+        category: document.getElementById('privateCategory').value,
+        description: document.getElementById('privateDescription').value.trim(),
+        contact: document.getElementById('privateContact').value.trim(),
+        location: formatAddress(
+          getFieldValue('privateStreet'),
+          getFieldValue('privateCity'),
+          getFieldValue('privateState'),
+          getFieldValue('privateZip')
+        ),
+        resourceName: document.getElementById('privateResourceName').value.trim(),
+        resourceType: document.getElementById('privateResourceType').value.trim(),
+        quantity: document.getElementById('privateQuantity').value.trim(),
+        availabilityNotes: document.getElementById('privateAvailabilityNotes').value.trim(),
+        deliverWithinHours: document.getElementById('privateDelivery').value,
+        offerClosesAt: document.getElementById('privateClose').value,
+        targetOrganizationId: document.getElementById('privateTarget').value
+      };
+
+      if (!payload.location) {
+        return setMessage('Please provide street, city, state, and ZIP code for the private offer.');
+      }
+
+      const res = await api('/api/private-offers', { method: 'POST', body: JSON.stringify(payload) });
+      if (!res.success) return setMessage(res.error || 'Could not create private offer.');
+
+      await refreshData();
+      setMessage('Private offer sent to nonprofit.');
+    }
+
+    async function findBestMatch() {
+      const need = document.getElementById('needText').value.trim();
+      const location = document.getElementById('needLocation').value.trim();
+      if (!need) return setMessage('Describe your need first.');
+
+      const res = await api('/api/organization/best-match', {
+        method: 'POST',
+        body: JSON.stringify({ need, location })
+      });
+      if (!res.success) return setMessage(res.error || 'Could not run AI match.');
+
+      state.bestMatch = res;
+      state.message = '';
+      render();
+    }
+
+    async function runGeneralAI() {
+      const prompt = document.getElementById('generalAiPrompt').value.trim();
+      if (!prompt) return setMessage('Write a prompt first.');
+
+      const res = await api(`/api/ai-recommendations?input=${encodeURIComponent(prompt)}`);
+      if (!res.success) return setMessage(res.error || 'AI request failed.');
+
+      state.aiInsights = {
+        summary: `${res.assistant.summary} (Built from ${res.basis && res.basis.listingsAnalyzed ? res.basis.listingsAnalyzed : 0} live listings, client need details, urgency, location, and current platform signals.)`,
+        recommendations: res.assistant.actions || [],
+        improvements: res.assistant.tips || []
+      };
+      setMessage('AI response generated from app data only.');
+    }
+
+    async function runQuickRecommend() {
+      const promptEl = document.getElementById('generalAiPrompt');
+      const existingPrompt = promptEl ? promptEl.value.trim() : '';
+      const fallbackPrompt = state.user && state.user.role === 'organization'
+        ? `Recommend the best current support option near ${state.user.location || 'my area'}`
+        : `Recommend where I can help most right now near ${state.user && state.user.location ? state.user.location : 'my area'}`;
+      const prompt = existingPrompt || fallbackPrompt;
+      if (promptEl && !existingPrompt) {
+        promptEl.value = prompt;
+      }
+
+      const res = await api(`/api/recommend/${encodeURIComponent(prompt)}`);
+      if (!res.success) return setMessage(res.error || 'Recommendation request failed.');
+
+      state.aiInsights = {
+        summary: `${res.assistant.summary} (Built from ${res.basis && res.basis.listingsAnalyzed ? res.basis.listingsAnalyzed : 0} live listings, client need details, urgency, location, and current platform signals.)`,
+        recommendations: res.assistant.actions || [],
+        improvements: res.assistant.tips || []
+      };
+      setMessage('Top recommendation generated from current app data.');
+    }
+
+    async function runClassicMatchSearch() {
+      const query = document.getElementById('classicMatchQuery').value.trim();
+      if (!query) return setMessage('Enter a search query first.');
+
+      const res = await api(`/api/match/${encodeURIComponent(query)}`);
+      if (!res.success) return setMessage(res.error || 'Could not run match search.');
+
+      state.legacyMatches = (res.results || []).filter((item) => item.score > 0).slice(0, 8);
+      setMessage('Classic match search complete.');
+    }
+
+    function pushChat(role, text, actions) {
+      state.chatHistory.push({ role, text, actions: actions || [] });
+    }
+
+    async function sendChat() {
+      const inputEl = document.getElementById('chatInput');
+      const message = inputEl.value.trim();
+      if (!message) return;
+
+      pushChat('user', message, []);
+      inputEl.value = '';
+      render();
+
+      const res = await api('/api/chat', {
+        method: 'POST',
+        body: JSON.stringify({ message })
+      });
+
+      if (!res.success) {
+        pushChat('assistant', res.error || 'Chat request failed.', []);
+        render();
+        return;
+      }
+
+      const reply = res.reply || {};
+      state.lastChatReply = reply;
+      const actions = [];
+      (reply.actions || []).forEach((a) => actions.push(a));
+      (reply.suggestions || []).forEach((s) => actions.push(s));
+      pushChat('assistant', reply.message || 'Done.', actions);
+      render();
+    }
+
+    function sendPresetChat(promptText) {
+      const inputEl = document.getElementById('chatInput');
+      if (!inputEl) return;
+      inputEl.value = promptText;
+      sendChat();
+    }
+
+    async function handleChatAction(actionId, chatIndex, actionIndex) {
+      const item = state.chatHistory[chatIndex];
+      const action = item && item.actions ? item.actions[actionIndex] : null;
+      const data = action ? action.data : null;
+
+      if (!actionId) return;
+
+      if (actionId.indexOf('select_match_') === 0 && data) {
+        const text = `Selected ${data.businessName}. Contact: ${data.contact || 'not provided'}.`;
+        pushChat('assistant', text, [
+          { id: 'accept', text: 'Accept top match', data },
+          { id: 'show_more', text: 'Show more matches' }
+        ]);
+        render();
+        return;
+      }
+
+      if (actionId === 'show_more') {
+        const more = state.lastChatReply && state.lastChatReply.listings ? state.lastChatReply.listings.slice(1, 4) : [];
+        if (!more.length) {
+          pushChat('assistant', 'No more matches were available in the latest response.', []);
+        } else {
+          const msg = more.map((m, i) => `${i + 1}. ${m.businessName} (${m.category})`).join(' | ');
+          pushChat('assistant', `Other matches: ${msg}`, []);
+        }
+        render();
+        return;
+      }
+
+      if (actionId === 'copy_contact' && data && data.contact) {
+        try {
+          await navigator.clipboard.writeText(String(data.contact));
+          pushChat('assistant', `Copied contact: ${data.contact}`, []);
+        } catch (e) {
+          pushChat('assistant', `Contact: ${data.contact}`, []);
+        }
+        render();
+        return;
+      }
+
+      const res = await api('/api/chat/action', {
+        method: 'POST',
+        body: JSON.stringify({ action: actionId, data })
+      });
+
+      if (!res.success) {
+        pushChat('assistant', res.error || 'Action failed.', []);
+        render();
+        return;
+      }
+
+      const reply = res.reply || {};
+      const actions = (reply.nextStep && reply.nextStep.options) ? reply.nextStep.options : [];
+      pushChat('assistant', reply.message || 'Done.', actions);
+      render();
+    }
+
+    function setDashboardSection(section) {
+      const role = state.user && state.user.role ? state.user.role : 'organization';
+      const allowed = role === 'business'
+        ? new Set(['overview', 'post', 'board', 'activity', 'ai'])
+        : new Set(['overview', 'post', 'match', 'board', 'activity', 'ai']);
+      state.dashboardSection = allowed.has(section) ? section : 'overview';
+      render();
+    }
+
+    function categoryOptions() {
+      return ['food', 'space', 'equipment', 'service', 'time', 'other']
+        .map((c) => `<option value="${c}">${c}</option>`)
+        .join('');
+    }
+
+    function setListingFilter(filter) {
+      state.listingFilter = ['all', 'supply', 'demand'].includes(filter) ? filter : 'all';
+      const boardListings = getBoardListings();
+      if (boardListings.length && !boardListings.some((item) => item.id === state.selectedListingId)) {
+        state.selectedListingId = boardListings[0].id;
+      }
+      if (!boardListings.length) {
+        state.selectedListingId = '';
+      }
+      render();
+    }
+
+    function selectListing(listingId) {
+      state.selectedListingId = listingId;
+      render();
+    }
+
+    function getBoardListings() {
+      return state.listings.filter((item) => state.listingFilter === 'all' || item.type === state.listingFilter);
+    }
+
+    function getSelectedListing() {
+      const boardListings = getBoardListings();
+      return boardListings.find((item) => item.id === state.selectedListingId) || boardListings[0] || null;
+    }
+
+    function getActiveEngagementForListing(listingId) {
+      return state.engagements.find((engagement) => engagement.listingId === listingId && !['declined', 'cancelled', 'completed'].includes(engagement.status));
+    }
+
+    async function requestListing(listingId) {
+      const noteEl = document.getElementById(`requestMessage-${listingId}`);
+      const message = noteEl ? noteEl.value.trim() : '';
+      const res = await api(`/api/listings/${listingId}/requests`, {
+        method: 'POST',
+        body: JSON.stringify({ message })
+      });
+      if (!res.success) return setMessage(res.error || 'Could not send request.');
+      await refreshData();
+      setMessage('Request sent to the business. You can keep coordinating below.');
+    }
+
+    async function updateEngagementStatus(engagementId, status) {
+      const noteEl = document.getElementById(`engagementStatusNote-${engagementId}`);
+      const etaEl = document.getElementById(`engagementEta-${engagementId}`);
+      const locationEl = document.getElementById(`engagementLocation-${engagementId}`);
+      const res = await api(`/api/engagements/${engagementId}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status,
+          note: noteEl ? noteEl.value.trim() : '',
+          etaNote: etaEl ? etaEl.value.trim() : '',
+          locationNote: locationEl ? locationEl.value.trim() : ''
+        })
+      });
+      if (!res.success) return setMessage(res.error || 'Could not update engagement status.');
+      await refreshData();
+      setMessage(`Status updated to ${status.replace(/_/g, ' ')}.`);
+    }
+
+    async function sendEngagementMessage(engagementId) {
+      const messageEl = document.getElementById(`engagementMessage-${engagementId}`);
+      const etaEl = document.getElementById(`engagementEta-${engagementId}`);
+      const locationEl = document.getElementById(`engagementLocation-${engagementId}`);
+      const message = messageEl ? messageEl.value.trim() : '';
+      if (!message) return setMessage('Write a message first.');
+
+      const res = await api(`/api/engagements/${engagementId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({
+          message,
+          etaNote: etaEl ? etaEl.value.trim() : '',
+          locationNote: locationEl ? locationEl.value.trim() : ''
+        })
+      });
+      if (!res.success) return setMessage(res.error || 'Could not send message.');
+      await refreshData();
+      setMessage('Update sent.');
+    }
+
+    function renderListing(item) {
+      const privateChip = item.isPrivate === 1 ? '<span class="badge private">Private offer</span>' : '';
+      const engagement = getActiveEngagementForListing(item.id);
+      const canRequest = state.user && state.user.role === 'organization' && item.type === 'supply' && item.ownerUserId && item.ownerUserId !== state.user.id;
+      const cardClass = state.selectedListingId === item.id ? 'listing active' : 'listing';
+      return `
+        <div class="${cardClass}" onclick="selectListing('${item.id}')">
+          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start;">
+            <div>
+              <strong>${escapeHtml(item.businessName)}</strong>
+              <div class="small muted">${escapeHtml(item.location || 'Local')} · ${escapeHtml(item.category)} · ${escapeHtml(item.type === 'supply' ? 'offer' : 'request')}</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${privateChip}<span class="badge">${item.type === 'supply' ? 'Offer' : 'Request'}</span></div>
+          </div>
+          <div>${escapeHtml(item.description)}</div>
+          <div class="small muted">${escapeHtml(item.resourceName || item.resourceType || 'Open the detail panel to view the full record.')}</div>
+        </div>
+      `;
+    }
+
+    function renderListingDetail(item) {
+      if (!item) {
+        return '<div class="listing-detail"><strong>No listing selected</strong><div class="small muted">Click any offer or request to inspect the full record.</div></div>';
+      }
+
+      const engagement = getActiveEngagementForListing(item.id);
+      const canRequest = state.user && state.user.role === 'organization' && item.type === 'supply' && item.ownerUserId && item.ownerUserId !== state.user.id;
+      const details = [
+        ['Business / nonprofit', item.businessName],
+        ['Category', item.category],
+        ['Type', item.type === 'supply' ? 'Offer' : 'Request'],
+        ['Resource name', item.resourceName || 'Not specified'],
+        ['Type of resource', item.resourceType || 'Not specified'],
+        ['Quantity / capacity', item.quantity || 'Not specified'],
+        ['Location', item.location || 'Local'],
+        ['Delivery ETA', item.deliverWithinHours ? `${item.deliverWithinHours} hours` : 'Not specified'],
+        ['Expiration', item.offerClosesAt ? new Date(item.offerClosesAt).toLocaleString() : 'Not specified'],
+        ['Contact', item.contact || 'Not specified'],
+        ['Availability notes', item.availabilityNotes || 'Not specified']
+      ];
+      if (item.urgencyLevel && item.urgencyLevel !== 'normal') details.push(['Urgency', item.urgencyLevel]);
+
+      const requestArea = canRequest
+        ? engagement
+          ? `<div class="small muted">Request status: <span class="status-badge">${escapeHtml(engagement.status.replace(/_/g, ' '))}</span></div>`
+          : `
+            <div class="field"><label>Message to business</label><textarea class="textarea-sm" id="requestMessage-${item.id}" placeholder="We can use this listing and would like to coordinate pickup or arrival."></textarea></div>
+            <div class="inline-actions"><button class="btn" onclick="requestListing('${item.id}')">Request this listing</button></div>
+          `
+        : '';
+
+      return `
+        <div class="listing-detail">
+          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start;">
+            <div>
+              <div class="small muted">Selected listing</div>
+              <strong>${escapeHtml(item.businessName)}</strong>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center;">
+              <span class="badge">${item.type === 'supply' ? 'Offer' : 'Request'}</span>
+              ${item.isPrivate === 1 ? '<span class="badge private">Private offer</span>' : ''}
+              ${engagement ? `<span class="status-badge">${escapeHtml(engagement.status.replace(/_/g, ' '))}</span>` : ''}
+            </div>
+          </div>
+          <div>${escapeHtml(item.description)}</div>
+          <div class="detail-grid">
+            ${details.map(([label, value]) => `<div class="detail-box"><div class="small muted">${escapeHtml(label)}</div><div>${escapeHtml(value)}</div></div>`).join('')}
+          </div>
+          ${requestArea}
+        </div>
+      `;
+    }
+
+    function renderEngagementActions(engagement) {
+      const isBusiness = state.user.id === engagement.listingOwnerId;
+      const buttons = [];
+
+      if (isBusiness && engagement.status === 'requested') {
+        buttons.push(`<button class="btn" onclick="updateEngagementStatus('${engagement.id}', 'accepted')">Accept request</button>`);
+        buttons.push(`<button class="btn-alt" onclick="updateEngagementStatus('${engagement.id}', 'declined')">Decline</button>`);
+      }
+      if (isBusiness && ['accepted', 'preparing'].includes(engagement.status)) {
+        buttons.push(`<button class="btn" onclick="updateEngagementStatus('${engagement.id}', 'preparing')">Preparing</button>`);
+        buttons.push(`<button class="btn" onclick="updateEngagementStatus('${engagement.id}', 'on_the_way')">On the way</button>`);
+      }
+      if (isBusiness && engagement.status === 'on_the_way') {
+        buttons.push(`<button class="btn" onclick="updateEngagementStatus('${engagement.id}', 'delivered')">Mark delivered</button>`);
+      }
+      if (!isBusiness && ['requested', 'accepted', 'preparing', 'on_the_way'].includes(engagement.status)) {
+        buttons.push(`<button class="btn-alt" onclick="updateEngagementStatus('${engagement.id}', 'cancelled')">Cancel request</button>`);
+      }
+      if (!isBusiness && engagement.status === 'delivered') {
+        buttons.push(`<button class="btn" onclick="updateEngagementStatus('${engagement.id}', 'completed')">Confirm received</button>`);
+      }
+
+      return buttons.length ? `<div class="inline-actions">${buttons.join('')}</div>` : '';
+    }
+
+    function renderEngagements() {
+      if (!state.engagements.length) {
+        return '<div class="muted">No active coordination threads yet. Once a nonprofit requests a listing, the full conversation and status timeline will stay here.</div>';
+      }
+
+      return state.engagements.map((engagement) => {
+        const counterpart = state.user.id === engagement.listingOwnerId
+          ? (engagement.requesterOrganizationName || engagement.requesterDisplayName)
+          : (engagement.ownerOrganizationName || engagement.ownerDisplayName);
+        const messages = (engagement.messages || []).map((message) => `
+          <div class="message-bubble">
+            <div class="small muted">${escapeHtml(message.senderName)} - ${new Date(message.createdAt).toLocaleString()}</div>
+            <div>${escapeHtml(message.body)}</div>
+            ${message.etaNote ? `<div class="small muted">ETA: ${escapeHtml(message.etaNote)}</div>` : ''}
+            ${message.locationNote ? `<div class="small muted">Location update: ${escapeHtml(message.locationNote)}</div>` : ''}
+          </div>
+        `).join('');
+
+        return `
+          <div class="listing">
+            <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start;">
+              <div>
+                <strong>${escapeHtml(engagement.businessName)}</strong>
+                <div class="small muted">Coordinating with ${escapeHtml(counterpart || 'the other side')}</div>
+                <div class="small muted"><strong>You are chatting with:</strong> ${escapeHtml(counterpart || 'the other side')}</div>
+              </div>
+              <span class="status-badge">${escapeHtml(engagement.status.replace(/_/g, ' '))}</span>
+            </div>
+            <div>${escapeHtml(engagement.description)}</div>
+            <div class="detail-grid">
+              <div class="detail-box"><div class="small muted">Category</div><div>${escapeHtml(engagement.category)}</div></div>
+              <div class="detail-box"><div class="small muted">Resource name</div><div>${escapeHtml(engagement.resourceName || 'Not specified')}</div></div>
+              <div class="detail-box"><div class="small muted">Type</div><div>${escapeHtml(engagement.resourceType || 'Not specified')}</div></div>
+              <div class="detail-box"><div class="small muted">Quantity / capacity</div><div>${escapeHtml(engagement.quantity || 'Not specified')}</div></div>
+              <div class="detail-box"><div class="small muted">Location</div><div>${escapeHtml(engagement.location || 'Not specified')}</div></div>
+              <div class="detail-box"><div class="small muted">Expiration</div><div>${escapeHtml(engagement.offerClosesAt ? new Date(engagement.offerClosesAt).toLocaleString() : 'Not specified')}</div></div>
+              <div class="detail-box"><div class="small muted">Delivery ETA</div><div>${escapeHtml(engagement.deliverWithinHours ? `${engagement.deliverWithinHours} hours` : 'Not specified')}</div></div>
+              <div class="detail-box"><div class="small muted">Contact</div><div>${escapeHtml(engagement.contact || 'Not specified')}</div></div>
+            </div>
+            <div class="small muted">Availability notes: ${escapeHtml(engagement.availabilityNotes || 'Not specified')}</div>
+            <div class="message-thread">${messages}</div>
+            <div class="row two">
+              <div class="field"><label>New update</label><textarea class="textarea-sm" id="engagementMessage-${engagement.id}" placeholder="Confirm pickup timing, arrival details, food type, room access, equipment handoff, or any follow-up."></textarea></div>
+              <div class="row">
+                <div class="field"><label>ETA / timing</label><input id="engagementEta-${engagement.id}" placeholder="Arriving at 3:15 PM" /></div>
+                <div class="field"><label>Location update</label><input id="engagementLocation-${engagement.id}" placeholder="Front entrance on Oak Street" /></div>
+                <div class="field"><label>Status note</label><input id="engagementStatusNote-${engagement.id}" placeholder="Optional note when changing status" /></div>
+              </div>
+            </div>
+            <div class="inline-actions">
+              <button class="btn" onclick="sendEngagementMessage('${engagement.id}')">Send update</button>
+            </div>
+            ${renderEngagementActions(engagement)}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderBestMatchResult() {
+      if (!state.bestMatch || !state.bestMatch.best) return '';
+      const best = state.bestMatch.best;
+      return `
+        <div class="result">
+          <strong>Best match: ${escapeHtml(best.businessName)}</strong>
+          <div>${escapeHtml(best.description)}</div>
+          <div class="small muted">
+            Confidence ${best.confidence || 0}% - ${escapeHtml(best.location || 'Location unavailable')} -
+            ${best.deliverWithinHours ? `deliver in ${best.deliverWithinHours}h` : 'delivery speed not provided'}
+          </div>
+          <div class="small muted">Evidence: ${escapeHtml(best.evidence || '')}</div>
+          <div class="small muted">Analyzed: ${state.bestMatch.basis && state.bestMatch.basis.listingsAnalyzed ? state.bestMatch.basis.listingsAnalyzed : 0} live listings</div>
+        </div>
+      `;
+    }
+
+    function renderChatHistory() {
+      if (!state.chatHistory.length) {
+        return '<div class="small muted">Try: "I need food today" or "recommend resources for a workshop".</div>';
+      }
+
+      return state.chatHistory.map((item, chatIndex) => {
+        const actionButtons = (item.actions || []).map((a, actionIndex) => (
+          `<button class="btn-alt btn-mini" onclick="handleChatAction('${escapeHtml(a.id)}', ${chatIndex}, ${actionIndex})">${escapeHtml(a.text || a.id)}</button>`
+        )).join('');
+
+        return `
+          <div class="chat-item ${item.role === 'user' ? 'chat-user' : 'chat-assistant'}">
+            <div>${escapeHtml(item.text)}</div>
+            ${actionButtons ? `<div style="margin-top:8px;">${actionButtons}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderScreenNav() {
+      const items = state.user.role === 'business'
+        ? [
+            ['overview', 'Overview'],
+            ['post', 'Post offer'],
+            ['board', 'Live board'],
+            ['activity', 'Coordination chat'],
+            ['ai', 'AI assistant']
+          ]
+        : [
+            ['overview', 'Overview'],
+            ['post', 'Post request'],
+            ['match', 'Match'],
+            ['board', 'Live board'],
+            ['activity', 'Coordination chat'],
+            ['ai', 'AI assistant']
+          ];
+
+      return `
+        <div class="screen-nav">
+          ${items.map(([key, label]) => `<button class="screen-chip ${state.dashboardSection === key ? 'active' : ''}" onclick="setDashboardSection('${key}')">${escapeHtml(label)}</button>`).join('')}
+        </div>
+      `;
+    }
+
+    function renderOverviewPanel(roleIntro, selectedListing) {
+      return `
+        <div class="section-stack">
+          <div class="card">
+            <h3 style="margin-top:0;">Your current path</h3>
+            <div class="overview-grid">
+              <div class="quick-panel">
+                <div class="step-card">
+                  <strong>1. Post what you have or need</strong>
+                  <div class="small muted">Start with a resource, a request, or a private offer depending on your role.</div>
+                  <div class="inline-actions"><button class="btn" onclick="setDashboardSection('post')">Go to posting screen</button></div>
+                </div>
+                <div class="step-card">
+                  <strong>2. Match it quickly</strong>
+                  <div class="small muted">Use the matching screen to search current listings and recommendations.</div>
+                  <div class="inline-actions"><button class="btn-alt" onclick="setDashboardSection('match')">Open matching screen</button></div>
+                </div>
+                <div class="step-card">
+                  <strong>3. Keep coordination in one place</strong>
+                  <div class="small muted">Requests, acceptances, delivery timing, and messages stay together.</div>
+                  <div class="inline-actions"><button class="btn-alt" onclick="setDashboardSection('activity')">Open coordination screen</button></div>
+                </div>
+              </div>
+              <div class="quick-panel">
+                <div class="stat-strip">
+                  <div class="stat-tile"><strong>${state.stats && state.stats.total ? state.stats.total : 0}</strong><div class="small muted">active listings</div></div>
+                  <div class="stat-tile"><strong>${state.stats && state.stats.supply ? state.stats.supply : 0}</strong><div class="small muted">offers</div></div>
+                  <div class="stat-tile"><strong>${state.stats && state.stats.demand ? state.stats.demand : 0}</strong><div class="small muted">requests</div></div>
+                </div>
+                <div class="step-card">
+                  <strong>Live focus</strong>
+                  <div class="small muted">${escapeHtml(roleIntro)}</div>
+                  <div class="small muted">Selected board item: ${selectedListing ? escapeHtml(selectedListing.businessName) : 'No listing selected yet'}</div>
+                  <div class="inline-actions"><button class="btn-alt" onclick="setDashboardSection('board')">Jump to board</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 style="margin-top:0;">Recommended next actions</h3>
+            <div class="row two">
+              <div class="detail-box">
+                <div class="small muted">Posting screen</div>
+                <strong>${state.user.role === 'business' ? 'Create listings and send private offers' : 'Create requests and define urgency'}</strong>
+              </div>
+              <div class="detail-box">
+                <div class="small muted">Matching screen</div>
+                <strong>Use live data to get best-fit recommendations</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderAuth() {
+      root.innerHTML = `
+        <div class="card hero">
+          <h1>Welcome to Brisio</h1>
+          <p class="muted">A clean resource marketplace built for real collaboration between businesses and nonprofits.</p>
+          <div class="hero-actions">
+            <span class="badge">Professional dashboard</span>
+            <span class="badge">Direct board</span>
+            <span class="badge">Business + nonprofit access</span>
+          </div>
+          <ul class="soft-list">
+            <li>Businesses can post offers, set delivery timing, and send private help quickly.</li>
+            <li>Nonprofits can post urgent needs and request best-fit live matches.</li>
+            <li>Recommendations stay tied to live listings, client need details, urgency, location, and current platform signals.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h2>${state.authMode === 'register' ? 'Create account' : 'Sign in'}</h2>
+          <p class="muted">${state.authMode === 'register' ? 'Set up a new account to start posting or requesting resources.' : 'Use your account to access listings and AI matching.'}</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px;">
+            <button class="${state.authMode === 'login' ? 'btn' : 'btn-alt'}" onclick="setAuthMode('login')">Sign in</button>
+            <button class="${state.authMode === 'register' ? 'btn' : 'btn-alt'}" onclick="setAuthMode('register')">Create new account</button>
+          </div>
+          <div class="row two">
+            <div class="field"><label>Email</label><input id="authEmail" type="email" /></div>
+            <div class="field"><label>Password</label><input id="authPassword" type="password" /></div>
+            ${state.authMode === 'register' ? '<div class="field"><label>Your name</label><input id="authName" /></div>' : ''}
+            ${state.authMode === 'register' ? '<div class="field"><label>Nonprofit or business name</label><input id="authOrganizationName" /></div>' : ''}
+            ${state.authMode === 'register' ? '<div class="field"><label>Street address</label><input id="authStreet" placeholder="123 Main St" /></div>' : ''}
+            ${state.authMode === 'register' ? '<div class="field"><label>City</label><input id="authCity" placeholder="Austin" /></div>' : ''}
+            ${state.authMode === 'register' ? '<div class="field"><label>State</label><input id="authState" placeholder="TX" /></div>' : ''}
+            ${state.authMode === 'register' ? '<div class="field"><label>ZIP code</label><input id="authZip" placeholder="78701" /></div>' : ''}
+            ${state.authMode === 'register' ? '<div class="field"><label>Role</label><select id="authRole"><option value="business">Business</option><option value="organization">Nonprofit</option></select></div>' : ''}
+          </div>
+          <div style="margin-top:10px;display:flex;gap:8px;">
+            <button class="btn" onclick="submitAuth()">Continue</button>
+          </div>
+          ${state.message ? `<div class="message">${escapeHtml(state.message)}</div>` : ''}
+        </div>
+      `;
+    }
+
+    function renderDashboard() {
+      const roleClass = state.user.role === 'business' ? 'role-business' : 'role-organization';
+      const roleTitle = 'Dashboard';
+      const roleIntro = state.user.role === 'business'
+        ? 'List available resources, delivery speed, offer close time, and optionally send private offers.'
+        : 'Post urgent needs and ask AI for the best and closest offers.';
+
+      if (state.user.role === 'business' && state.dashboardSection === 'match') {
+        state.dashboardSection = 'board';
+      }
+
+      const boardListings = getBoardListings();
+      const selectedListing = getSelectedListing();
+      const legacyMatchesHtml = state.legacyMatches.length
+        ? state.legacyMatches.map((m) => `<div class="listing"><strong>${escapeHtml(m.businessName)}</strong><div>${escapeHtml(m.description)}</div><div class="small muted">score ${m.score} - ${escapeHtml(m.category)} - ${escapeHtml(m.location || 'local')}</div></div>`).join('')
+        : '<div class="small muted">Run a match query to use the classic ranking view.</div>';
+
+      const businessForm = `
+        <div class="card">
+          <h3>Create business listing</h3>
+          <div class="row two">
+            <div class="field"><label>Category</label><select id="listingCategory">${categoryOptions()}</select></div>
+            <div class="field"><label>Resource name</label><input id="listingResourceName" placeholder="Boxed lunches / projector set / meeting room" /></div>
+            <div class="field"><label>Type of resource</label><input id="listingResourceType" placeholder="Vegetarian meals / audio equipment / classroom space" /></div>
+            <div class="field"><label>Quantity or capacity</label><input id="listingQuantity" placeholder="30 meals / 2 projectors / room for 20" /></div>
+            <div class="field"><label>Delivery ETA (hours)</label><input id="listingDelivery" type="number" min="0" placeholder="4" /></div>
+            <div class="field"><label>Offer closes at (expiry)</label><input id="listingClose" type="datetime-local" /></div>
+            <div class="field">
+              <label>Private offer target (optional)</label>
+              <select id="listingPrivateTarget">
+                <option value="">Public listing</option>
+                ${state.organizations.map((o) => `<option value="${o.id}">${escapeHtml(o.organizationName || o.displayName)} (${escapeHtml(o.location || 'no location')})</option>`).join('')}
+              </select>
+            </div>
+            <div class="field"><label>Contact</label><input id="listingContact" /></div>
+            <div class="field"><label>Street address</label><input id="listingStreet" placeholder="123 Main St" /></div>
+            <div class="field"><label>City</label><input id="listingCity" placeholder="Austin" /></div>
+            <div class="field"><label>State</label><input id="listingState" placeholder="TX" /></div>
+            <div class="field"><label>ZIP code</label><input id="listingZip" placeholder="78701" /></div>
+          </div>
+          <div class="field"><label>Availability notes</label><input id="listingAvailabilityNotes" placeholder="Pickup after 2 PM, elevator access, allergen notes, setup details" /></div>
+          <div class="field"><label>Description</label><textarea id="listingDescription"></textarea></div>
+          <button class="btn" onclick="submitListing()">Post listing</button>
+        </div>
+        <div class="card">
+          <h3>Send private offer directly</h3>
+          <div class="row two">
+            <div class="field">
+              <label>Nonprofit</label>
+              <select id="privateTarget">${state.organizations.map((o) => `<option value="${o.id}">${escapeHtml(o.organizationName || o.displayName)}</option>`).join('')}</select>
+            </div>
+            <div class="field"><label>Category</label><select id="privateCategory">${categoryOptions()}</select></div>
+            <div class="field"><label>Resource name</label><input id="privateResourceName" placeholder="Shelf-stable food boxes / folding tables" /></div>
+            <div class="field"><label>Type of resource</label><input id="privateResourceType" placeholder="Pantry staples / event furniture / workshop room" /></div>
+            <div class="field"><label>Quantity or capacity</label><input id="privateQuantity" placeholder="20 boxes / 8 tables / room for 40" /></div>
+            <div class="field"><label>Deliver in hours</label><input id="privateDelivery" type="number" min="0" /></div>
+            <div class="field"><label>Offer closes at</label><input id="privateClose" type="datetime-local" /></div>
+            <div class="field"><label>Contact</label><input id="privateContact" /></div>
+            <div class="field"><label>Street address</label><input id="privateStreet" placeholder="123 Main St" /></div>
+            <div class="field"><label>City</label><input id="privateCity" placeholder="Austin" /></div>
+            <div class="field"><label>State</label><input id="privateState" placeholder="TX" /></div>
+            <div class="field"><label>ZIP code</label><input id="privateZip" placeholder="78701" /></div>
+          </div>
+          <div class="field"><label>Availability notes</label><input id="privateAvailabilityNotes" placeholder="Dock pickup, loading help available, room access instructions" /></div>
+          <div class="field"><label>Description</label><textarea id="privateDescription"></textarea></div>
+          <button class="btn" onclick="submitPrivateOffer()">Send private offer</button>
+        </div>
+      `;
+
+      const nonprofitForm = `
+        <div class="card">
+          <h3>Create nonprofit request</h3>
+          <div class="row two">
+            <div class="field"><label>Category</label><select id="listingCategory">${categoryOptions()}</select></div>
+            <div class="field"><label>Resource name</label><input id="listingResourceName" placeholder="Family meal pickup / PA system / classroom space" /></div>
+            <div class="field"><label>Type needed</label><input id="listingResourceType" placeholder="Halal meals / portable speakers / accessible room" /></div>
+            <div class="field"><label>Quantity or capacity needed</label><input id="listingQuantity" placeholder="60 meals / 1 sound system / room for 25" /></div>
+            <div class="field">
+              <label>Urgency</label>
+              <select id="listingUrgency">
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+            <div class="field"><label>Contact</label><input id="listingContact" /></div>
+            <div class="field"><label>Street address</label><input id="listingStreet" placeholder="123 Main St" /></div>
+            <div class="field"><label>City</label><input id="listingCity" placeholder="Austin" /></div>
+            <div class="field"><label>State</label><input id="listingState" placeholder="TX" /></div>
+            <div class="field"><label>ZIP code</label><input id="listingZip" placeholder="78701" /></div>
+          </div>
+          <div class="field"><label>Availability notes</label><input id="listingAvailabilityNotes" placeholder="Need elevator access, arrival after school hours, refrigeration preferred" /></div>
+          <div class="field"><label>Need description</label><textarea id="listingDescription"></textarea></div>
+          <button class="btn" onclick="submitListing()">Post request</button>
+        </div>
+        <div class="card">
+          <h3>AI best + closest match</h3>
+          <p class="small muted">This uses current listings plus need context such as urgency, timing, and location. No invented data.</p>
+          <div class="row two">
+            <div class="field"><label>Your need</label><textarea id="needText" placeholder="Need 60 boxed meals by tomorrow morning"></textarea></div>
+            <div class="field"><label>Preferred location</label><input id="needLocation" value="${escapeHtml(state.user.location || '')}" /></div>
+          </div>
+          <button class="btn" onclick="findBestMatch()">Find best match</button>
+          ${renderBestMatchResult()}
+        </div>
+      `;
+
+      let sectionContent = '';
+      if (state.dashboardSection === 'overview') {
+        sectionContent = renderOverviewPanel(roleIntro, selectedListing);
+      } else if (state.dashboardSection === 'post') {
+        sectionContent = `
+          <div class="section-stack">
+            ${state.user.role === 'business' ? businessForm : nonprofitForm}
+          </div>
+        `;
+      } else if (state.dashboardSection === 'match') {
+        sectionContent = `
+          <div class="section-stack">
+            <div class="card">
+              <h3 style="margin-top:0;">Quick match search</h3>
+              <p class="small muted">Search the current listings directly by text.</p>
+              <div class="field"><label>Search text</label><input id="classicMatchQuery" placeholder="meeting room afternoon" /></div>
+              <div style="margin-top:10px;"><button class="btn" onclick="runClassicMatchSearch()">Find matches</button></div>
+              <div style="margin-top:12px;">${legacyMatchesHtml}</div>
+            </div>
+          </div>
+        `;
+      } else if (state.dashboardSection === 'board') {
+        sectionContent = `
+          <div class="card">
+            <h3>Live board</h3>
+            <p class="small muted">Click an offer or request to open the full record, then switch between all, offers, and requests.</p>
+            <div class="board-toolbar">
+              <button class="btn-chip ${state.listingFilter === 'all' ? 'active' : ''}" onclick="setListingFilter('all')">All active</button>
+              <button class="btn-chip ${state.listingFilter === 'supply' ? 'active' : ''}" onclick="setListingFilter('supply')">Offers</button>
+              <button class="btn-chip ${state.listingFilter === 'demand' ? 'active' : ''}" onclick="setListingFilter('demand')">Requests</button>
+            </div>
+            <div class="board-shell">
+              <div>
+                ${boardListings.length ? boardListings.map(renderListing).join('') : '<div class="muted">No listings match this view.</div>'}
+              </div>
+              <div>
+                ${renderListingDetail(selectedListing)}
+              </div>
+            </div>
+          </div>
+        `;
+      } else if (state.dashboardSection === 'activity') {
+        sectionContent = `
+          <div class="card">
+            <h3>Coordination chat</h3>
+            <p class="small muted">Yes, this is the live thread with the person or organization you are working with, plus status updates like requested, accepted, on the way, and delivered.</p>
+            ${renderEngagements()}
+          </div>
+        `;
+      } else if (state.dashboardSection === 'ai') {
+        sectionContent = `
+          <div class="card">
+            <h3>Live match assistant</h3>
+            <p class="small muted">Answers are built from real listing data, user needs, urgency cues, location, and live platform context.</p>
+            <div class="field"><textarea id="generalAiPrompt" placeholder="Ask for suggestions based on current listings"></textarea></div>
+            <div class="inline-actions">
+              <button class="btn" onclick="runQuickRecommend()">Recommend for me</button>
+              <button class="btn-alt" onclick="runGeneralAI()">Ask AI</button>
+            </div>
+            ${state.aiInsights ? `<div class="result"><strong>Summary</strong><div>${escapeHtml(state.aiInsights.summary || '')}</div><div class="small muted" style="margin-top:6px;">${(state.aiInsights.recommendations || []).slice(0, 3).map((r) => escapeHtml(`${r.title}: ${r.action}`)).join(' - ')}</div></div>` : ''}
+          </div>
+        `;
+      }
+
+      root.innerHTML = `
+        <div class="card hero">
+          <div class="topbar">
+            <div>
+              <div><span class="pill ${roleClass}">${roleLabel(state.user.role)}</span></div>
+              <h2 style="margin:6px 0 0;">${roleTitle}</h2>
+              <div class="muted">Welcome, ${escapeHtml(state.user.displayName)}. ${roleIntro}</div>
+            </div>
+            <button class="btn-alt" onclick="logout()">Sign out</button>
+          </div>
+        </div>
+
+        ${renderScreenNav()}
+        ${sectionContent}
+
+        ${state.message ? `<div class="card message">${escapeHtml(state.message)}</div>` : ''}
+      `;
+    }
+
+    function render() {
+      userLine.textContent = state.user
+        ? `${state.user.displayName} - ${roleLabel(state.user.role)}${state.user.location ? ` - ${state.user.location}` : ''}`
+        : '';
+
+      if (state.view === 'loading') {
+        root.innerHTML = '<div class="card">Loading...</div>';
+        return;
+      }
+      if (!state.user || state.view === 'auth') {
+        renderAuth();
+        return;
+      }
+      renderDashboard();
+    }
+
+    window.submitAuth = submitAuth;
+    window.setAuthMode = setAuthMode;
+    window.logout = logout;
+    window.submitListing = submitListing;
+    window.submitPrivateOffer = submitPrivateOffer;
+    window.findBestMatch = findBestMatch;
+    window.runQuickRecommend = runQuickRecommend;
+    window.runGeneralAI = runGeneralAI;
+    window.runClassicMatchSearch = runClassicMatchSearch;
+    window.requestListing = requestListing;
+    window.updateEngagementStatus = updateEngagementStatus;
+    window.sendEngagementMessage = sendEngagementMessage;
+    window.sendChat = sendChat;
+    window.sendPresetChat = sendPresetChat;
+    window.handleChatAction = handleChatAction;
+
+    boot();
+  </script>
+</body>
+</html>

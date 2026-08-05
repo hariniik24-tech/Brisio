@@ -1,0 +1,60 @@
+
+===== 2026-07-12T16:53:51.729Z =====
+{"endpoint":"/api/chat","messagePreview":"I need to feed 30 homeless people right away","intent":{"type":"need","category":"other","urgency":false},"matches":4}
+
+===== 2026-07-12T17:14:42.808Z =====
+{"endpoint":"/api/ai-recommendations","inputPreview":"what is the best listing to give food for","role":"business","resultCount":4,"basis":{"listingsAnalyzed":5,"stats":{"supply":3,"demand":2}}}
+
+===== 2026-07-15T00:36:27.413Z =====
+{"endpoint":"/api/recommend/:query","inputPreview":"recommend some places I could get food right away","role":"business","resultCount":4,"basis":{"listingsAnalyzed":5,"stats":{"supply":3,"demand":2}}}
+
+===== 2026-07-15T00:36:28.597Z =====
+{"endpoint":"/api/recommend/:query","inputPreview":"Recommend where I can help most right now near hiohohiu","role":"business","resultCount":4,"basis":{"listingsAnalyzed":5,"stats":{"supply":3,"demand":2}}}
+
+===== 2026-07-15T00:36:29.591Z =====
+{"endpoint":"/api/recommend/:query","inputPreview":"Recommend where I can help most right now near hiohohiu","role":"business","resultCount":4,"basis":{"listingsAnalyzed":5,"stats":{"supply":3,"demand":2}}}
+
+===== 2026-07-15T00:36:31.082Z =====
+{"endpoint":"/api/recommend/:query","inputPreview":"Recommend where I can help most right now near hiohohiu","role":"business","resultCount":4,"basis":{"listingsAnalyzed":5,"stats":{"supply":3,"demand":2}}}
+
+===== 2026-07-15T00:36:32.291Z =====
+{"endpoint":"/api/recommend/:query","inputPreview":"Recommend where I can help most right now near hiohohiu","role":"business","resultCount":4,"basis":{"listingsAnalyzed":5,"stats":{"supply":3,"demand":2}}}
+
+===== 2026-07-15T00:36:35.207Z =====
+{"endpoint":"/api/recommend/:query","inputPreview":"Recommend where I can help most right now near hiohohiu","role":"business","resultCount":4,"basis":{"listingsAnalyzed":5,"stats":{"supply":3,"demand":2}}}
+
+===== 2026-07-15T00:42:43.282Z =====
+{"endpoint":"/api/recommend/:query","inputPreview":"Recommend where I can help most right now near hiohohiu","role":"business","resultCount":4,"basis":{"listingsAnalyzed":5,"stats":{"supply":3,"demand":2}}}
+
+===== 2026-07-15T00:42:44.443Z =====
+{"endpoint":"/api/recommend/:query","inputPreview":"Recommend where I can help most right now near hiohohiu","role":"business","resultCount":4,"basis":{"listingsAnalyzed":5,"stats":{"supply":3,"demand":2}}}
+
+===== 2026-07-15T00:42:49.310Z =====
+{"endpoint":"/api/recommend/:query","inputPreview":"Recommend where I can help most right now near hiohohiu","role":"business","resultCount":4,"basis":{"listingsAnalyzed":5,"stats":{"supply":3,"demand":2}}}
+
+===== 2026-07-15T00:42:52.559Z =====
+{"endpoint":"/api/recommend/:query","inputPreview":"Recommend where I can help most right now near hiohohiu","role":"business","resultCount":4,"basis":{"listingsAnalyzed":5,"stats":{"supply":3,"demand":2}}}
+
+===== 2026-08-04T23:31:42.203Z =====
+{"type":"register","userId":"e7da205d-46ab-4233-b3c4-5d0317b354ca","email":"fixed1785886301617@example.com"}
+
+===== 2026-08-04T23:33:51.117Z =====
+{"type":"register","userId":"a4645415-6714-4315-8aed-b35568eba5c7","email":"haribumz@gmail.com"}
+
+===== 2026-08-04T23:34:36.048Z =====
+{"type":"login","userId":"a4645415-6714-4315-8aed-b35568eba5c7","email":"haribumz@gmail.com"}
+
+===== 2026-08-04T23:37:32.389Z =====
+{"type":"register","userId":"c3b206b9-7df7-4032-9269-4073dbb85a4f","email":"verifyui1785886651810@example.com"}
+
+===== 2026-08-04T23:38:16.336Z =====
+{"type":"register","userId":"7b08d3ef-4603-48e4-92ab-853e1bd1c34c","email":"finalui1785886695690@example.com"}
+
+===== 2026-08-04T23:39:02.766Z =====
+{"type":"login","userId":"a4645415-6714-4315-8aed-b35568eba5c7","email":"haribumz@gmail.com"}
+
+===== 2026-08-04T23:39:03.632Z =====
+{"type":"login","userId":"a4645415-6714-4315-8aed-b35568eba5c7","email":"haribumz@gmail.com"}
+
+===== 2026-08-05T03:49:46.512Z =====
+{"type":"login","userId":"a4645415-6714-4315-8aed-b35568eba5c7","email":"haribumz@gmail.com"}

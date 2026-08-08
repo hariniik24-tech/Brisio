@@ -79,6 +79,26 @@ function verifyPassword(password, storedValue) {
   return crypto.timingSafeEqual(expected, actual);
 }
 
+function validatePassword(password) {
+  const value = String(password || '');
+  const hasUppercase = /[A-Z]/.test(value);
+  const hasLowercase = /[a-z]/.test(value);
+  const hasNumber = /\d/.test(value);
+  const hasSpecialCharacter = /[^A-Za-z0-9]/.test(value);
+
+  if (
+    value.length < 10 ||
+    !hasUppercase ||
+    !hasLowercase ||
+    !hasNumber ||
+    !hasSpecialCharacter
+  ) {
+    return 'password must be at least 10 characters and include uppercase, lowercase, number, and special character';
+  }
+
+  return null;
+}
+
 async function issueSession(userId) {
   const token = crypto.randomBytes(32).toString('hex');
   const createdAt = new Date().toISOString();
@@ -871,8 +891,9 @@ app.post('/api/auth/register', async (req, res) => {
     if (!['business', 'organization'].includes(role)) {
       return res.status(400).json({ success: false, error: 'role must be business or organization' });
     }
-    if (String(password).length < 8) {
-      return res.status(400).json({ success: false, error: 'password must be at least 8 characters' });
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({ success: false, error: passwordError });
     }
 
     const userId = crypto.randomUUID();

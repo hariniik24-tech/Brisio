@@ -54,6 +54,16 @@ function formatAddress(street: string, city: string, stateCode: string, zip: str
   return [street.trim(), city.trim(), stateCode.trim(), zip.trim()].filter(Boolean).join(', ');
 }
 
+function getPasswordPolicyError(password: string) {
+  const value = password.trim();
+  if (value.length < 10) return 'Password must be at least 10 characters.';
+  if (!/[A-Z]/.test(value)) return 'Password must include at least one uppercase letter.';
+  if (!/[a-z]/.test(value)) return 'Password must include at least one lowercase letter.';
+  if (!/\d/.test(value)) return 'Password must include at least one number.';
+  if (!/[^A-Za-z0-9]/.test(value)) return 'Password must include at least one special character.';
+  return '';
+}
+
 export default function HomeScreen() {
   const session = useSessionContext();
   const [stats, setStats] = useState<Stats>(emptyStats);
@@ -166,6 +176,14 @@ export default function HomeScreen() {
 
   async function submitAuth() {
     if (!email.trim() || !password.trim()) return;
+    session.clearError();
+    const passwordError = getPasswordPolicyError(password);
+    if (passwordError) {
+      setFormError(passwordError);
+      return;
+    }
+
+    setFormError('');
     const location = formatAddress(authStreet, authCity, authState, authZip);
     await session.signUp({
       email: email.trim(),
@@ -295,6 +313,9 @@ export default function HomeScreen() {
                 value={password}
                 onChangeText={setPassword}
               />
+              <ThemedText type="small" style={styles.helperText}>
+                Password must be at least 10 characters and include uppercase, lowercase, number, and special character.
+              </ThemedText>
 
               <TextInput
                 style={styles.input}
@@ -603,6 +624,9 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#B54840',
+  },
+  helperText: {
+    opacity: 0.72,
   },
   successText: {
     color: '#256A4A',

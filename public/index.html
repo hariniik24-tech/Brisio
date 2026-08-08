@@ -715,6 +715,16 @@
       return [street, city, stateCode, zip].filter(Boolean).join(', ');
     }
 
+    function getPasswordPolicyError(password) {
+      const value = String(password || '');
+      if (value.length < 10) return 'Password must be at least 10 characters.';
+      if (!/[A-Z]/.test(value)) return 'Password must include at least one uppercase letter.';
+      if (!/[a-z]/.test(value)) return 'Password must include at least one lowercase letter.';
+      if (!/\d/.test(value)) return 'Password must include at least one number.';
+      if (!/[^A-Za-z0-9]/.test(value)) return 'Password must include at least one special character.';
+      return '';
+    }
+
     async function submitAuth() {
       const email = document.getElementById('authEmail').value.trim();
       const password = document.getElementById('authPassword').value;
@@ -725,6 +735,11 @@
 
       let res;
       if (state.authMode === 'register') {
+        const passwordError = getPasswordPolicyError(password);
+        if (passwordError) {
+          return setMessage(passwordError);
+        }
+
         const role = document.getElementById('authRole').value;
         const name = document.getElementById('authName').value.trim();
         const organizationName = document.getElementById('authOrganizationName').value.trim();
@@ -1394,6 +1409,7 @@
           <div class="row two">
             <div class="field"><label>Email</label><input id="authEmail" type="email" /></div>
             <div class="field"><label>Password</label><input id="authPassword" type="password" /></div>
+            ${state.authMode === 'register' ? '<div class="field" style="grid-column:1 / -1;"><small class="muted">Password must be at least 10 characters and include uppercase, lowercase, number, and special character.</small></div>' : ''}
             ${state.authMode === 'register' ? '<div class="field"><label>Your name</label><input id="authName" /></div>' : ''}
             ${state.authMode === 'register' ? '<div class="field"><label>Nonprofit or business name</label><input id="authOrganizationName" /></div>' : ''}
             ${state.authMode === 'register' ? '<div class="field"><label>Street address</label><input id="authStreet" placeholder="123 Main St" /></div>' : ''}

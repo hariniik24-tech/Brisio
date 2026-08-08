@@ -11,7 +11,7 @@
       "icon": "./assets/expo.icon",
       "supportsTablet": true,
       "bundleIdentifier": "com.brisio.app",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

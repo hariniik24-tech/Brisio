@@ -5,8 +5,6 @@ import { ApiUser, getMe, loginUser, logoutUser, registerUser } from '@/constants
 
 const TOKEN_KEY = 'brisio-auth-token';
 
-type AuthMode = 'login' | 'register';
-
 type RegisterInput = {
   email: string;
   password: string;
@@ -21,7 +19,6 @@ export function useSession() {
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState('');
   const [user, setUser] = useState<ApiUser | null>(null);
-  const [authMode, setAuthMode] = useState<AuthMode>('register');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -97,10 +94,8 @@ export function useSession() {
     busy,
     token,
     user,
-    authMode,
     error,
     isAuthenticated: !!token && !!user,
-    setAuthMode,
     clearError: () => setError(''),
     signIn,
     signUp,

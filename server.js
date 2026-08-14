@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
+const nodemailer = require('nodemailer');
 
 dotenv.config({ path: path.join(__dirname, '.env.local') });
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -25,6 +26,16 @@ if (!supabaseUrl || !supabaseAnonKey || !/^https?:\/\//i.test(String(supabaseUrl
 const supabaseServerKey = supabaseServiceRoleKey || supabaseAnonKey;
 const supabase = createClient(supabaseUrl, supabaseServerKey);
 
+const smtpHost = String(process.env.SMTP_HOST || '').trim();
+const smtpPort = Number(process.env.SMTP_PORT || '587');
+const smtpSecure = String(process.env.SMTP_SECURE || '').trim().toLowerCase() === 'true';
+const smtpUser = String(process.env.SMTP_USER || '').trim();
+const smtpPass = String(process.env.SMTP_PASS || '').trim();
+const resetEmailFrom = String(process.env.RESET_EMAIL_FROM || smtpUser || '').trim();
+const includeResetCodeInResponse = String(process.env.INCLUDE_RESET_CODE_IN_RESPONSE || '').trim().toLowerCase() === 'true';
+
+let resetMailer = null;
+
 function explainSupabaseError(error) {
   const message = String(error?.message || error || 'Unknown Supabase error');
   if (message.includes("Could not find the table 'public.users' in the schema cache")) {
@@ -34,7 +45,7 @@ function explainSupabaseError(error) {
 }
 
 async function verifySupabaseSchema() {
-  const requiredTables = ['users', 'sessions', 'listings', 'engagements', 'engagement_messages', 'reports'];
+  const requiredTables = ['users', 'sessions', 'listings', 'engagements', 'engagement_messages', 'reports', 'blocks', 'password_reset_tokens'];
   for (const table of requiredTables) {
     const { error } = await supabase.from(table).select('*').limit(1);
     if (error) {
@@ -97,6 +108,57 @@ function validatePassword(password) {
   }
 
   return null;
+}
+
+function generateResetCode() {
+  return String(crypto.randomInt(100000, 999999));
+}
+
+function hashResetCode(code) {
+  return crypto.createHash('sha256').update(String(code)).digest('hex');
+}
+
+async function clearExistingResetTokens(userId) {
+  await supabase.from('password_reset_tokens').delete().eq('userId', userId);
+}
+
+function getResetMailer() {
+  if (resetMailer) return resetMailer;
+  if (!smtpHost || !smtpUser || !smtpPass || !Number.isFinite(smtpPort) || !resetEmailFrom) return null;
+
+  resetMailer = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpSecure,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+  });
+  return resetMailer;
+}
+
+async function sendResetCodeEmail({ to, resetCode, expiresAt }) {
+  const mailer = getResetMailer();
+  if (!mailer) {
+    appendInstrumentation({ type: 'forgot-password-email-skipped', reason: 'smtp-not-configured', email: to });
+    return false;
+  }
+
+  const expiresText = new Date(expiresAt).toLocaleString('en-US', { timeZone: 'UTC', timeZoneName: 'short' });
+  try {
+    await mailer.sendMail({
+      from: resetEmailFrom,
+      to,
+      subject: 'Your Brisio password reset code',
+      text: `Your Brisio reset code is ${resetCode}. This code expires at ${expiresText}. If you did not request this, you can ignore this email.`,
+    });
+    return true;
+  } catch (error) {
+    console.error('Reset email send error:', error);
+    appendInstrumentation({ type: 'forgot-password-email-failed', email: to, error: String(error?.message || error) });
+    return false;
+  }
 }
 
 async function issueSession(userId) {
@@ -240,7 +302,33 @@ async function getVisibleActiveListings(user) {
     .order('createdAt', { ascending: false });
   
   if (error) throw error;
-  return listings.filter((listing) => isListingVisibleToUser(listing, user) && !isListingExpired(listing));
+
+  let blockedUserIds = new Set();
+  if (user?.id) {
+    const { data: blockedRows, error: blockedError } = await supabase
+      .from('blocks')
+      .select('blockedUserId, blockeduserid')
+      .eq('blockerUserId', user.id);
+
+    if (blockedError) throw blockedError;
+    blockedUserIds = new Set((blockedRows || []).map((row) => getFirstDefined(row, ['blockedUserId', 'blockeduserid'])).filter(Boolean));
+  }
+
+  return listings.filter((listing) => {
+    const ownerUserId = String(listing.ownerUserId || listing.owneruserid || '');
+    return isListingVisibleToUser(listing, user) && !isListingExpired(listing) && (!ownerUserId || !blockedUserIds.has(ownerUserId));
+  });
+}
+
+async function getBlockedUsersForUser(userId) {
+  const { data, error } = await supabase
+    .from('blocks')
+    .select('id, blockerUserId, blockedUserId, createdAt')
+    .eq('blockerUserId', userId)
+    .order('createdAt', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
 }
 
 function canAccessEngagement(engagement, user) {
@@ -939,6 +1027,153 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'email is required' });
+    }
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('email', email)
+      .single();
+
+    if (error || !user) {
+      return res.json({ success: true, message: 'If the email exists, a reset code has been sent.' });
+    }
+
+    const resetCode = generateResetCode();
+    const createdAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 30).toISOString();
+    const codeHash = hashResetCode(resetCode);
+
+    await clearExistingResetTokens(user.id);
+    const { error: insertError } = await supabase.from('password_reset_tokens').insert([{
+      id: crypto.randomUUID(),
+      userId: user.id,
+      userid: user.id,
+      codeHash,
+      codehash: codeHash,
+      createdAt,
+      createdat: createdAt,
+      expiresAt,
+      expiresat: expiresAt,
+      usedAt: null,
+      usedat: null,
+    }]);
+
+    if (insertError) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(insertError) });
+    }
+
+    const emailSent = await sendResetCodeEmail({
+      to: user.email,
+      resetCode,
+      expiresAt,
+    });
+
+    appendInstrumentation({
+      type: 'forgot-password',
+      userId: user.id,
+      email: user.email,
+      emailSent,
+    });
+
+    const payload = {
+      success: true,
+      message: 'If the email exists, a reset code has been sent.',
+      expiresAt,
+    };
+    if (includeResetCodeInResponse) {
+      payload.resetCode = resetCode;
+    }
+
+    res.json(payload);
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ success: false, error: explainSupabaseError(err) });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const resetCode = String(req.body?.resetCode || '').trim();
+    const password = String(req.body?.password || '');
+
+    if (!email || !resetCode || !password) {
+      return res.status(400).json({ success: false, error: 'email, resetCode, and password are required' });
+    }
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({ success: false, error: passwordError });
+    }
+
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('email', email)
+      .single();
+
+    if (userError || !user) {
+      return res.status(400).json({ success: false, error: 'Invalid reset code' });
+    }
+
+    const { data: tokens, error: tokenError } = await supabase
+      .from('password_reset_tokens')
+      .select('*')
+      .eq('userId', user.id)
+      .eq('usedAt', null)
+      .order('createdAt', { ascending: false })
+      .limit(1);
+
+    if (tokenError) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(tokenError) });
+    }
+
+    const tokenRow = tokens && tokens[0];
+    if (!tokenRow) {
+      return res.status(400).json({ success: false, error: 'No active reset code found' });
+    }
+
+    const expiresAt = new Date(getFirstDefined(tokenRow, ['expiresAt', 'expiresat'])).getTime();
+    if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) {
+      return res.status(400).json({ success: false, error: 'Reset code expired' });
+    }
+
+    const expectedHash = getFirstDefined(tokenRow, ['codeHash', 'codehash']);
+    if (hashResetCode(resetCode) !== expectedHash) {
+      return res.status(400).json({ success: false, error: 'Invalid reset code' });
+    }
+
+    const passwordHash = hashPassword(password);
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ passwordHash, passwordhash: passwordHash })
+      .eq('id', user.id);
+
+    if (updateError) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(updateError) });
+    }
+
+    const usedAt = new Date().toISOString();
+    await supabase
+      .from('password_reset_tokens')
+      .update({ usedAt, usedat: usedAt })
+      .eq('id', getFirstDefined(tokenRow, ['id']));
+    await supabase.from('sessions').delete().eq('userId', user.id);
+
+    appendInstrumentation({ type: 'reset-password', userId: user.id, email: user.email });
+    res.json({ success: true, message: 'Password reset successful' });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ success: false, error: explainSupabaseError(err) });
+  }
+});
+
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -1226,6 +1461,48 @@ app.post('/api/listings/:id/requests', async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Listing not found' });
     }
 
+    const ownerUserId = String(listing.ownerUserId || listing.owneruserid || '');
+    if (!ownerUserId) {
+      return res.status(400).json({ success: false, error: 'Listing is missing owner information' });
+    }
+
+    if (ownerUserId === req.user.id) {
+      return res.status(400).json({ success: false, error: 'You cannot start a private chat with your own listing' });
+    }
+
+    const { data: ownerUser, error: ownerFetchError } = await supabase
+      .from('users')
+      .select('id, role')
+      .eq('id', ownerUserId)
+      .single();
+
+    if (ownerFetchError || !ownerUser) {
+      return res.status(404).json({ success: false, error: 'Listing owner not found' });
+    }
+
+    const ownerRole = String(ownerUser.role || '');
+    const requesterRole = String(req.user.role || '');
+    const rolePair = new Set([ownerRole, requesterRole]);
+    const isBusinessNonprofitPair = rolePair.has('business') && rolePair.has('organization') && rolePair.size === 2;
+    if (!isBusinessNonprofitPair) {
+      return res.status(400).json({ success: false, error: 'Private chat is only available between a business and a nonprofit' });
+    }
+
+    const { data: existingEngagement } = await supabase
+      .from('engagements')
+      .select('id, status')
+      .eq('listingId', req.params.id)
+      .eq('listingOwnerId', ownerUserId)
+      .eq('requesterUserId', req.user.id)
+      .in('status', ['requested', 'accepted', 'preparing', 'on_the_way', 'delivered'])
+      .order('updatedAt', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingEngagement?.id) {
+      return res.json({ success: true, engagementId: existingEngagement.id, reused: true });
+    }
+
     const engagementId = crypto.randomUUID();
     const now = new Date().toISOString();
 
@@ -1233,8 +1510,8 @@ app.post('/api/listings/:id/requests', async (req, res, next) => {
       id: engagementId,
       listingId: req.params.id,
       listingid: req.params.id,
-      listingOwnerId: listing.ownerUserId,
-      listingownerid: listing.ownerUserId,
+      listingOwnerId: ownerUserId,
+      listingownerid: ownerUserId,
       requesterUserId: req.user.id,
       requesteruserid: req.user.id,
       status: 'requested',
@@ -1373,6 +1650,7 @@ app.get('/api/stats', async (req, res) => {
     const { data: listings } = await supabase.from('listings').select('type, urgent, active');
     const { data: users } = await supabase.from('users').select('role');
     const { data: engagements } = await supabase.from('engagements').select('status');
+    const { data: reports } = await supabase.from('reports').select('id');
 
     const stats = {
       totalListings: listings?.length || 0,
@@ -1384,7 +1662,11 @@ app.get('/api/stats', async (req, res) => {
       businessUsers: users?.filter(u => u.role === 'business').length || 0,
       organizationUsers: users?.filter(u => u.role === 'organization').length || 0,
       totalEngagements: engagements?.length || 0,
-      completedEngagements: engagements?.filter(e => e.status === 'completed').length || 0
+      completedEngagements: engagements?.filter(e => e.status === 'completed').length || 0,
+      total: listings?.filter(l => l.active === 1).length || 0,
+      supply: listings?.filter(l => l.type === 'supply').length || 0,
+      demand: listings?.filter(l => l.type === 'demand').length || 0,
+      reports: reports?.length || 0
     };
 
     res.json({ success: true, stats });
@@ -1560,11 +1842,171 @@ app.post('/api/organization/best-match', async (req, res) => {
 });
 
 app.post('/api/reports', async (req, res) => {
-  res.json({ success: false, error: 'Not implemented' });
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+
+    const listingId = String(req.body?.listingId || '').trim();
+    const reason = String(req.body?.reason || '').trim();
+    const details = String(req.body?.details || '').trim();
+
+    if (!listingId) {
+      return res.status(400).json({ success: false, error: 'listingId is required' });
+    }
+    if (!reason) {
+      return res.status(400).json({ success: false, error: 'reason is required' });
+    }
+
+    const { data: listing, error: listingError } = await supabase
+      .from('listings')
+      .select('id, ownerUserId, owneruserid, businessName')
+      .eq('id', listingId)
+      .single();
+
+    if (listingError || !listing) {
+      return res.status(404).json({ success: false, error: 'Listing not found' });
+    }
+
+    const reportId = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
+    const { error } = await supabase.from('reports').insert([{
+      id: reportId,
+      listingId,
+      listingid: listingId,
+      reporterName: req.user.displayName,
+      reportername: req.user.displayName,
+      reason,
+      details,
+      createdAt,
+      createdat: createdAt,
+    }]);
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    appendInstrumentation({ type: 'report_listing', userId: req.user.id, listingId, reason });
+    res.json({ success: true, reportId });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.get('/api/reports', async (req, res) => {
-  res.json({ success: true, reports: [] });
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+
+    const { data, error } = await supabase
+      .from('reports')
+      .select('*')
+      .order('createdAt', { ascending: false });
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    res.json({ success: true, reports: data || [] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/blocks', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+
+    const blockedUsers = await getBlockedUsersForUser(req.user.id);
+    res.json({ success: true, blockedUsers });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/blocks', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+
+    const blockedUserId = String(req.body?.blockedUserId || '').trim();
+    if (!blockedUserId) {
+      return res.status(400).json({ success: false, error: 'blockedUserId is required' });
+    }
+    if (blockedUserId === req.user.id) {
+      return res.status(400).json({ success: false, error: 'You cannot block yourself' });
+    }
+
+    const { data: existingBlock, error: existingError } = await supabase
+      .from('blocks')
+      .select('id')
+      .eq('blockerUserId', req.user.id)
+      .eq('blockedUserId', blockedUserId)
+      .maybeSingle();
+
+    if (existingError) {
+      return res.status(500).json({ success: false, error: existingError.message });
+    }
+    if (existingBlock) {
+      return res.json({ success: true, blocked: true });
+    }
+
+    const { data: targetUser, error: targetError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', blockedUserId)
+      .single();
+
+    if (targetError || !targetUser) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('blocks').insert([{
+      id: crypto.randomUUID(),
+      blockerUserId: req.user.id,
+      blockeruserid: req.user.id,
+      blockedUserId,
+      blockeduserid: blockedUserId,
+      createdAt: now,
+      createdat: now,
+    }]);
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    appendInstrumentation({ type: 'block_user', userId: req.user.id, blockedUserId });
+    res.json({ success: true, blocked: true });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/blocks/:blockedUserId', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+
+    const blockedUserId = String(req.params.blockedUserId || '').trim();
+    if (!blockedUserId) {
+      return res.status(400).json({ success: false, error: 'blockedUserId is required' });
+    }
+
+    const { error } = await supabase
+      .from('blocks')
+      .delete()
+      .eq('blockerUserId', req.user.id)
+      .eq('blockedUserId', blockedUserId);
+
+    if (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+
+    res.json({ success: true, blocked: false });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.get('/api/recommend/:query', async (req, res) => {
@@ -1602,6 +2044,7 @@ app.post('/api/chat', async (req, res) => {
     await requireAuth(req, res, () => {});
     if (!req.user) return;
 
+    const { data: reports } = await supabase.from('reports').select('id');
     const message = String(req.body?.message || '').trim();
     if (!message) return res.status(400).json({ success: false, error: 'message is required' });
 

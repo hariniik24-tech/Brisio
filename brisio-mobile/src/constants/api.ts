@@ -19,6 +19,53 @@ export type ApiListing = {
   contact: string;
   location: string;
   active: number;
+  ownerUserId: string;
+  createdAt: string;
+};
+
+export type ApiEngagementMessage = {
+  id: string;
+  engagementId: string;
+  senderUserId: string;
+  senderName: string;
+  body: string;
+  etaNote?: string;
+  locationNote?: string;
+  createdAt: string;
+};
+
+export type ApiEngagement = {
+  id: string;
+  listingId: string;
+  listingOwnerId: string;
+  requesterUserId: string;
+  status: 'requested' | 'accepted' | 'preparing' | 'on_the_way' | 'delivered' | 'completed' | 'declined' | 'cancelled';
+  createdAt: string;
+  updatedAt: string;
+  businessName?: string;
+  category?: string;
+  description?: string;
+  location?: string;
+  ownerDisplayName?: string;
+  ownerOrganizationName?: string;
+  requesterDisplayName?: string;
+  requesterOrganizationName?: string;
+  messages: ApiEngagementMessage[];
+};
+
+export type ApiReport = {
+  id: string;
+  listingId: string;
+  reporterName: string;
+  reason: string;
+  details: string;
+  createdAt: string;
+};
+
+export type ApiBlock = {
+  id: string;
+  blockerUserId: string;
+  blockedUserId: string;
   createdAt: string;
 };
 
@@ -42,9 +89,21 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
-  const payload = await response.json();
+  const rawBody = await response.text();
+  let payload: any = {};
+  if (rawBody) {
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      if (!response.ok) {
+        throw new Error('Server returned a non-JSON error response. Please update/redeploy the API server and try again.');
+      }
+      throw new Error('Server returned an unexpected response format.');
+    }
+  }
+
   if (!response.ok || payload.success === false) {
-    throw new Error(payload.error || 'Request failed');
+    throw new Error(payload.error || payload.message || 'Request failed');
   }
 
   return payload as T;
@@ -71,6 +130,20 @@ export async function loginUser(input: { email: string; password: string }) {
   });
 }
 
+export async function requestPasswordReset(input: { email: string }) {
+  return apiRequest<{ success: true; message: string; resetCode?: string; expiresAt?: string }>('/api/auth/forgot-password', {
+    method: 'POST',
+    body: input,
+  });
+}
+
+export async function confirmPasswordReset(input: { email: string; resetCode: string; password: string }) {
+  return apiRequest<{ success: true; message: string }>('/api/auth/reset-password', {
+    method: 'POST',
+    body: input,
+  });
+}
+
 export async function getMe(token: string) {
   return apiRequest<{ success: true; user: ApiUser }>('/api/auth/me', { token });
 }
@@ -90,6 +163,32 @@ export async function getListings(token: string) {
   return apiRequest<{ success: true; count: number; listings: ApiListing[] }>('/api/listings', { token });
 }
 
+export async function reportListing(
+  token: string,
+  input: { listingId: string; reason: string; details?: string }
+) {
+  return apiRequest<{ success: true; reportId: string }>('/api/reports', {
+    method: 'POST',
+    token,
+    body: input,
+  });
+}
+
+export async function blockUser(token: string, input: { blockedUserId: string }) {
+  return apiRequest<{ success: true; blocked: boolean }>('/api/blocks', {
+    method: 'POST',
+    token,
+    body: input,
+  });
+}
+
+export async function unblockUser(token: string, blockedUserId: string) {
+  return apiRequest<{ success: true; blocked: boolean }>(`/api/blocks/${encodeURIComponent(blockedUserId)}`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
 export async function createListing(
   token: string,
   input: {
@@ -102,6 +201,29 @@ export async function createListing(
   }
 ) {
   return apiRequest<{ success: true; listing: ApiListing }>('/api/listings', {
+    method: 'POST',
+    token,
+    body: input,
+  });
+}
+
+export async function getEngagements(token: string) {
+  return apiRequest<{ success: true; engagements: ApiEngagement[] }>('/api/engagements', { token });
+}
+
+export async function requestListingEngagement(token: string, listingId: string) {
+  return apiRequest<{ success: true; engagementId: string }>(`/api/listings/${encodeURIComponent(listingId)}/requests`, {
+    method: 'POST',
+    token,
+  });
+}
+
+export async function sendEngagementMessage(
+  token: string,
+  engagementId: string,
+  input: { body: string; etaNote?: string; locationNote?: string }
+) {
+  return apiRequest<{ success: true; messageId: string }>(`/api/engagements/${encodeURIComponent(engagementId)}/messages`, {
     method: 'POST',
     token,
     body: input,

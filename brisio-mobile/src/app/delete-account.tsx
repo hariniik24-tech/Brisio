@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
-import { Link } from 'expo-router';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
+import { useRouter } from 'expo-router';
 
+import { StackScreenShell } from '@/components/stack-screen-shell';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { deleteUserAccount } from '@/constants/api';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
 
 export default function DeleteAccountScreen() {
+  const router = useRouter();
   const session = useSessionContext();
   const [confirmText, setConfirmText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -35,11 +36,10 @@ export default function DeleteAccountScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <ThemedView style={styles.container}>
-        <Link href="/" asChild>
+    <StackScreenShell>
+        <Pressable onPress={() => router.push('/')} style={styles.backBtn} hitSlop={10}>
           <ThemedText type="smallBold">Back to Home</ThemedText>
-        </Link>
+        </Pressable>
         <ThemedText type="subtitle">Delete Account</ThemedText>
         <ThemedText type="small">
           This action permanently removes your account, your listings, sessions, and related
@@ -55,24 +55,17 @@ export default function DeleteAccountScreen() {
           placeholder="DELETE ACCOUNT"
           autoCapitalize="characters"
         />
-        <Pressable style={styles.deleteBtn} onPress={handleDelete}>
+        <Pressable style={styles.deleteBtn} onPress={handleDelete} hitSlop={12}>
           {busy ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Delete my account</ThemedText>}
         </Pressable>
         {!!message && <ThemedText type="small">{message}</ThemedText>}
-      </ThemedView>
-    </ScrollView>
+    </StackScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    padding: Spacing.four,
-    alignItems: 'center',
-  },
-  container: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    gap: Spacing.three,
+  backBtn: {
+    alignSelf: 'flex-start',
   },
   input: {
     borderWidth: 1,

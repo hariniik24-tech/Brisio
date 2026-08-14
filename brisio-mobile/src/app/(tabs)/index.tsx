@@ -1,22 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ApiListing, createListing, getListings } from '@/constants/api';
+import { ApiListing, createListing, getListings, requestListingEngagement } from '@/constants/api';
 import { API_BASE_URL } from '@/constants/config';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
+
+const INPUT_PLACEHOLDER_COLOR = '#6A7685';
 
 type Stats = {
   total: number;
@@ -54,17 +48,8 @@ function formatAddress(street: string, city: string, stateCode: string, zip: str
   return [street.trim(), city.trim(), stateCode.trim(), zip.trim()].filter(Boolean).join(', ');
 }
 
-function getPasswordPolicyError(password: string) {
-  const value = password.trim();
-  if (value.length < 10) return 'Password must be at least 10 characters.';
-  if (!/[A-Z]/.test(value)) return 'Password must include at least one uppercase letter.';
-  if (!/[a-z]/.test(value)) return 'Password must include at least one lowercase letter.';
-  if (!/\d/.test(value)) return 'Password must include at least one number.';
-  if (!/[^A-Za-z0-9]/.test(value)) return 'Password must include at least one special character.';
-  return '';
-}
-
 export default function HomeScreen() {
+  const router = useRouter();
   const session = useSessionContext();
   const [stats, setStats] = useState<Stats>(emptyStats);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -72,20 +57,16 @@ export default function HomeScreen() {
 
   const [listings, setListings] = useState<ApiListing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(false);
-
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [role, setRole] = useState<'business' | 'organization'>('business');
-  const [organizationName, setOrganizationName] = useState('');
-  const [authStreet, setAuthStreet] = useState('');
-  const [authCity, setAuthCity] = useState('');
-  const [authState, setAuthState] = useState('');
-  const [authZip, setAuthZip] = useState('');
+  const [chatBusyListingId, setChatBusyListingId] = useState('');
 
   const [form, setForm] = useState<ListingForm>(initialForm);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiSummary, setAiSummary] = useState('');
+  const [aiActions, setAiActions] = useState<string[]>([]);
+  const [aiError, setAiError] = useState('');
+  const [aiBusy, setAiBusy] = useState(false);
 
   const endpoint = useMemo(() => `${API_BASE_URL}/api/stats`, []);
 
@@ -174,27 +155,6 @@ export default function HomeScreen() {
     };
   }, [session.isAuthenticated, session.token]);
 
-  async function submitAuth() {
-    if (!email.trim() || !password.trim()) return;
-    session.clearError();
-    const passwordError = getPasswordPolicyError(password);
-    if (passwordError) {
-      setFormError(passwordError);
-      return;
-    }
-
-    setFormError('');
-    const location = formatAddress(authStreet, authCity, authState, authZip);
-    await session.signUp({
-      email: email.trim(),
-      password,
-      role,
-      name: name.trim(),
-      organizationName: organizationName.trim(),
-      location,
-    });
-  }
-
   async function submitListing() {
     if (!session.token || !session.user) return;
     setFormError('');
@@ -242,6 +202,61 @@ export default function HomeScreen() {
     }
   }
 
+  async function runAiAssistant() {
+    if (!session.token) return;
+
+    const fallbackPrompt = session.user?.role === 'organization'
+      ? `Recommend the best current support options near ${session.user.location || 'my area'}`
+      : `Recommend where we can help most right now near ${session.user?.location || 'our area'}`;
+    const prompt = aiPrompt.trim() || fallbackPrompt;
+
+    setAiBusy(true);
+    setAiError('');
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/recommend/${encodeURIComponent(prompt)}`, {
+        headers: {
+          Authorization: `Bearer ${session.token}`,
+        },
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload.success || !payload.assistant) {
+        throw new Error(payload.error || 'AI request failed');
+      }
+
+      const actions = (payload.assistant.actions || [])
+        .map((item: { title?: string; action?: string }) => `${item.title || 'Suggestion'}: ${item.action || ''}`)
+        .filter(Boolean)
+        .slice(0, 4);
+
+      setAiSummary(payload.assistant.summary || 'No summary available yet.');
+      setAiActions(actions);
+      setAiPrompt(prompt);
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'Could not run AI assistant.');
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function startPrivateChatFromListing(listingId: string) {
+    if (!session.token) return;
+    setFormError('');
+    setFormSuccess('');
+    setChatBusyListingId(listingId);
+    try {
+      const response = await requestListingEngagement(session.token, listingId);
+      setFormSuccess('Private chat request sent. Opening conversation...');
+      router.push({
+        pathname: '/chats',
+        params: { engagementId: response.engagementId },
+      });
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Could not start private chat.');
+    } finally {
+      setChatBusyListingId('');
+    }
+  }
+
   if (session.booting) {
     return (
       <ThemedView style={styles.centerLoader}>
@@ -254,122 +269,39 @@ export default function HomeScreen() {
     <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
       <ThemedView style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
+          <View pointerEvents="none" style={styles.backgroundArtwork}>
+            <View style={[styles.blob, styles.blobTopRight]} />
+            <View style={[styles.blob, styles.blobTopLeft]} />
+            <View style={[styles.blob, styles.blobBottom]} />
+          </View>
+
           <ThemedView style={styles.heroSection}>
+            <Image source={require('@/assets/images/icon.png')} style={styles.heroLogo} resizeMode="contain" />
             <ThemedText type="title" style={styles.title}>
-              Brisio Mobile
+              Brisio
             </ThemedText>
             <ThemedText type="small" style={styles.subtitle}>
               Bridging resources. Strengthening communities.
             </ThemedText>
-          </ThemedView>
-
-          <ThemedView type="backgroundElement" style={styles.panel}>
-            <ThemedText type="smallBold">App Store pages</ThemedText>
-            <ThemedView style={styles.linkGrid}>
-              <Link href="/privacy-policy" asChild>
-                <Pressable style={styles.linkBtn}>
-                  <ThemedText type="smallBold">Privacy</ThemedText>
-                </Pressable>
-              </Link>
-              <Link href="/terms" asChild>
-                <Pressable style={styles.linkBtn}>
-                  <ThemedText type="smallBold">Terms</ThemedText>
-                </Pressable>
-              </Link>
-              <Link href="/support" asChild>
-                <Pressable style={styles.linkBtn}>
-                  <ThemedText type="smallBold">Support</ThemedText>
-                </Pressable>
-              </Link>
-              <Link href="/delete-account" asChild>
-                <Pressable style={styles.linkBtn}>
-                  <ThemedText type="smallBold">Delete account</ThemedText>
-                </Pressable>
-              </Link>
-              <Link href="/reviewer-info" asChild>
-                <Pressable style={styles.linkBtn}>
-                  <ThemedText type="smallBold">Reviewer info</ThemedText>
-                </Pressable>
-              </Link>
-            </ThemedView>
+            <ThemedText type="small" style={styles.heroCaption}>
+              Brisio helps businesses and nonprofits share resources, post requests, and coordinate support in one place.
+            </ThemedText>
           </ThemedView>
 
           {!session.isAuthenticated ? (
-            <ThemedView type="backgroundElement" style={styles.panel}>
-              <ThemedText type="smallBold">Create your account</ThemedText>
-
-              <TextInput
-                style={styles.input}
-                placeholder="Email"
-                autoCapitalize="none"
-                keyboardType="email-address"
-                value={email}
-                onChangeText={setEmail}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Password"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
+            <ThemedView type="backgroundElement" style={[styles.panel, styles.authPanel]}>
+              <ThemedText type="smallBold">Account access</ThemedText>
               <ThemedText type="small" style={styles.helperText}>
-                Password must be at least 10 characters and include uppercase, lowercase, number, and special character.
+                Choose whether you want to sign in or create a new account on a dedicated page.
               </ThemedText>
-
-              <TextInput
-                style={styles.input}
-                placeholder="Your name"
-                value={name}
-                onChangeText={setName}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Nonprofit or business name"
-                value={organizationName}
-                onChangeText={setOrganizationName}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Street address"
-                value={authStreet}
-                onChangeText={setAuthStreet}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="City"
-                value={authCity}
-                onChangeText={setAuthCity}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="State"
-                value={authState}
-                onChangeText={setAuthState}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="ZIP code"
-                value={authZip}
-                onChangeText={setAuthZip}
-              />
               <View style={styles.modeRow}>
-                <Pressable
-                  style={[styles.modeBtn, role === 'business' && styles.modeBtnActive]}
-                  onPress={() => setRole('business')}>
-                  <ThemedText type="smallBold">Business</ThemedText>
+                <Pressable style={styles.modeBtn} onPress={() => router.push('/auth?mode=login')}>
+                  <ThemedText type="smallBold">Sign in</ThemedText>
                 </Pressable>
-                <Pressable
-                  style={[styles.modeBtn, role === 'organization' && styles.modeBtnActive]}
-                  onPress={() => setRole('organization')}>
-                  <ThemedText type="smallBold">Nonprofit</ThemedText>
+                <Pressable style={styles.modeBtn} onPress={() => router.push('/auth?mode=register')}>
+                  <ThemedText type="smallBold">Create account</ThemedText>
                 </Pressable>
               </View>
-
-              <Pressable style={styles.primaryBtn} onPress={submitAuth}>
-                <ThemedText type="smallBold">{session.busy ? 'Please wait...' : 'Continue'}</ThemedText>
-              </Pressable>
-              {!!session.error && <ThemedText style={styles.errorText}>{session.error}</ThemedText>}
             </ThemedView>
           ) : (
             <>
@@ -381,13 +313,65 @@ export default function HomeScreen() {
                   Role: {session.user.role === 'organization' ? 'nonprofit' : session.user.role}
                 </ThemedText>
                 <ThemedText type="small">API endpoint: {endpoint}</ThemedText>
+                <ThemedView style={styles.rolePathPanel}>
+                  <ThemedText type="smallBold">
+                    {session.user.role === 'organization' ? 'Nonprofit path: Explore + request' : 'Business path: Offer + deliver'}
+                  </ThemedText>
+                  <ThemedText type="small" style={styles.rolePathText}>
+                    {session.user.role === 'organization'
+                      ? 'Focus on exploring active offers and requesting what your organization needs.'
+                      : 'Focus on posting available resources and coordinating delivery quickly.'}
+                  </ThemedText>
+                </ThemedView>
+                <Link href="/chats" asChild>
+                  <Pressable style={styles.primaryBtn}>
+                    <ThemedText type="smallBold">Open private chats</ThemedText>
+                  </Pressable>
+                </Link>
                 <Pressable style={styles.secondaryBtn} onPress={session.signOut}>
                   <ThemedText type="smallBold">Sign out</ThemedText>
                 </Pressable>
               </ThemedView>
 
               <ThemedView type="backgroundElement" style={styles.panel}>
-                <ThemedText type="smallBold">Create listing</ThemedText>
+                <ThemedText type="smallBold">AI assistant</ThemedText>
+                <ThemedText type="small" style={styles.helperText}>
+                  Ask for live recommendations based on current listings and your role.
+                </ThemedText>
+                <TextInput
+                  style={[styles.input, styles.multilineInput]}
+                  placeholder="Ask AI where to help next or what to request first"
+                  placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+                  multiline
+                  value={aiPrompt}
+                  onChangeText={setAiPrompt}
+                />
+                <Pressable style={styles.primaryBtn} onPress={runAiAssistant}>
+                  <ThemedText type="smallBold">{aiBusy ? 'Analyzing...' : 'Get AI recommendation'}</ThemedText>
+                </Pressable>
+                {!!aiSummary && <ThemedText type="small">{aiSummary}</ThemedText>}
+                {aiActions.map((item) => (
+                  <ThemedText key={item} type="small" style={styles.helperText}>
+                    • {item}
+                  </ThemedText>
+                ))}
+                {!!aiError && <ThemedText style={styles.errorText}>{aiError}</ThemedText>}
+              </ThemedView>
+
+              <ThemedView
+                type="backgroundElement"
+                style={[
+                  styles.panel,
+                  session.user.role === 'business' ? styles.businessListingPanel : styles.nonprofitListingPanel,
+                ]}>
+                <ThemedText type="smallBold">
+                  {session.user.role === 'business' ? 'Create business offer' : 'Create nonprofit need'}
+                </ThemedText>
+                <ThemedText type="small" style={styles.helperText}>
+                  {session.user.role === 'business'
+                    ? 'Post available resources for nonprofits to discover and request.'
+                    : 'Post what your nonprofit needs so businesses can respond with support.'}
+                </ThemedText>
                 <TextInput
                   style={styles.input}
                   placeholder="Category (space, time, equipment, service, food, other)"
@@ -450,7 +434,9 @@ export default function HomeScreen() {
                   />
                 )}
                 <Pressable style={styles.primaryBtn} onPress={submitListing}>
-                  <ThemedText type="smallBold">Post listing</ThemedText>
+                  <ThemedText type="smallBold">
+                    {session.user.role === 'business' ? 'Post offer listing' : 'Post need listing'}
+                  </ThemedText>
                 </Pressable>
                 {!!formError && <ThemedText style={styles.errorText}>{formError}</ThemedText>}
                 {!!formSuccess && <ThemedText style={styles.successText}>{formSuccess}</ThemedText>}
@@ -473,6 +459,16 @@ export default function HomeScreen() {
                         {item.category} | {item.type}
                       </ThemedText>
                       <ThemedText type="small">{item.description}</ThemedText>
+                      <ThemedText type="small">{item.location}</ThemedText>
+                      {session.user && item.ownerUserId !== session.user.id ? (
+                        <Pressable
+                          style={styles.secondaryBtn}
+                          onPress={() => startPrivateChatFromListing(item.id)}>
+                          <ThemedText type="smallBold">
+                            {chatBusyListingId === item.id ? 'Starting chat...' : 'Start private chat'}
+                          </ThemedText>
+                        </Pressable>
+                      ) : null}
                     </ThemedView>
                   ))
                 )}
@@ -511,6 +507,7 @@ export default function HomeScreen() {
               <ThemedText type="subtitle">{stats.reports}</ThemedText>
             </ThemedView>
           </ThemedView>
+
         </SafeAreaView>
       </ThemedView>
     </ScrollView>
@@ -525,11 +522,12 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: '#F2F6FB',
   },
   contentContainer: {
     flexGrow: 1,
     alignItems: 'center',
-    paddingBottom: BottomTabInset + Spacing.three,
+    paddingBottom: BottomTabInset + Spacing.six,
   },
   container: {
     width: '100%',
@@ -543,35 +541,100 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     gap: Spacing.three,
     paddingTop: Platform.OS === 'web' ? Spacing.four : Spacing.two,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  backgroundArtwork: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+  },
+  blob: {
+    position: 'absolute',
+    borderRadius: 999,
+    opacity: 0.42,
+  },
+  blobTopRight: {
+    width: 240,
+    height: 240,
+    right: -90,
+    top: -60,
+    backgroundColor: '#D8ECFA',
+  },
+  blobTopLeft: {
+    width: 180,
+    height: 180,
+    left: -72,
+    top: 80,
+    backgroundColor: '#F8E8DA',
+  },
+  blobBottom: {
+    width: 260,
+    height: 260,
+    left: 40,
+    bottom: -170,
+    backgroundColor: '#E2F2EA',
   },
   heroSection: {
-    gap: Spacing.one,
+    gap: Spacing.two,
     marginTop: Spacing.two,
+    borderRadius: Spacing.four,
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.four,
+    backgroundColor: '#EEF5FD',
+    borderWidth: 1,
+    borderColor: '#DCE5F0',
+    shadowColor: '#244264',
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  heroLogo: {
+    width: 68,
+    height: 68,
+    borderRadius: 16,
   },
   title: {
     textAlign: 'left',
+    fontSize: 40,
+    lineHeight: 44,
+    color: '#1E2F46',
   },
   subtitle: {
-    opacity: 0.82,
+    opacity: 0.9,
+    color: '#2F4967',
+    letterSpacing: 0.2,
+  },
+  heroCaption: {
+    color: '#556B84',
+    lineHeight: 20,
   },
   panel: {
     borderRadius: Spacing.four,
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.three,
     gap: Spacing.two,
-  },
-  linkGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-  },
-  linkBtn: {
     borderWidth: 1,
-    borderColor: '#BFC7D4',
-    borderRadius: Spacing.four,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    backgroundColor: '#F5F7FB',
+    borderColor: '#E0E5EC',
+    shadowColor: '#1B3A5A',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  authPanel: {
+    backgroundColor: '#FFFFFF',
+  },
+  businessListingPanel: {
+    backgroundColor: '#F8FCFF',
+    borderColor: '#D5E6F6',
+  },
+  nonprofitListingPanel: {
+    backgroundColor: '#F7FBF6',
+    borderColor: '#D8E8D4',
   },
   modeRow: {
     flexDirection: 'row',
@@ -580,22 +643,60 @@ const styles = StyleSheet.create({
   modeBtn: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#BFC7D4',
+    borderColor: '#CDD5E1',
     borderRadius: Spacing.four,
-    paddingVertical: Spacing.two,
+    paddingVertical: 10,
     alignItems: 'center',
+    backgroundColor: '#FAFBFD',
   },
   modeBtnActive: {
-    backgroundColor: '#E8EEF8',
+    backgroundColor: '#E6EDF8',
+    borderColor: '#9CB4D6',
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.two,
+    borderWidth: 1,
+    borderColor: '#D6DFEA',
+    borderRadius: Spacing.three,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.two,
+    backgroundColor: '#F9FCFF',
+  },
+  checkboxRowActive: {
+    borderColor: '#90A8C8',
+    backgroundColor: '#EFF5FD',
+  },
+  checkboxIndicator: {
+    color: '#2F4B6A',
+    marginTop: 1,
+  },
+  checkboxText: {
+    flex: 1,
+    color: '#3A526E',
+  },
+  inlineLinkRow: {
+    flexDirection: 'row',
+    gap: Spacing.three,
+    marginTop: Spacing.one,
+  },
+  inlineLinkText: {
+    color: '#2E5E96',
+  },
+  inputLabel: {
+    color: '#2A3A4F',
+    fontWeight: '700',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#C7D0DD',
+    borderColor: '#C3CDDB',
     borderRadius: Spacing.three,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+    paddingVertical: 10,
     fontSize: 14,
     backgroundColor: '#FFFFFF',
+    color: '#1C2735',
   },
   multilineInput: {
     minHeight: 90,
@@ -604,18 +705,40 @@ const styles = StyleSheet.create({
   primaryBtn: {
     alignItems: 'center',
     borderRadius: Spacing.four,
-    paddingVertical: Spacing.two,
+    paddingVertical: Spacing.three,
     borderWidth: 1,
-    borderColor: '#7FA3C9',
-    backgroundColor: '#E8F1FB',
+    borderColor: '#476C9D',
+    backgroundColor: '#CFE1F8',
+    marginTop: Spacing.one,
+    shadowColor: '#2D4D74',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   secondaryBtn: {
     alignItems: 'center',
     borderRadius: Spacing.four,
-    paddingVertical: Spacing.two,
+    paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#C8CFDA',
-    backgroundColor: '#F5F7FB',
+    borderColor: '#CDD5E1',
+    backgroundColor: '#F7F9FC',
+  },
+  rolePathPanel: {
+    borderWidth: 1,
+    borderColor: '#D6E2EF',
+    borderRadius: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    backgroundColor: '#F5FAFF',
+    gap: Spacing.one,
+  },
+  rolePathText: {
+    color: '#4E6682',
+  },
+  forgotLinkBtn: {
+    alignSelf: 'flex-start',
+    marginTop: Spacing.one,
   },
   loadingRow: {
     flexDirection: 'row',
@@ -626,7 +749,8 @@ const styles = StyleSheet.create({
     color: '#B54840',
   },
   helperText: {
-    opacity: 0.72,
+    color: '#5B6778',
+    lineHeight: 18,
   },
   successText: {
     color: '#256A4A',
@@ -635,6 +759,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.two,
+    paddingBottom: Spacing.three,
   },
   statTile: {
     width: '48%',
@@ -643,12 +768,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     gap: Spacing.one,
+    borderWidth: 1,
+    borderColor: '#DCE4EE',
   },
   listingItem: {
     borderWidth: 1,
-    borderColor: '#D6DEE8',
+    borderColor: '#D7E0EA',
     borderRadius: Spacing.three,
     padding: Spacing.two,
     gap: Spacing.one,
+    backgroundColor: '#FBFCFE',
   },
 });

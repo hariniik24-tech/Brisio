@@ -11,6 +11,7 @@
     :root {
       --bg: #f6fbff;
       --surface: #ffffff;
+      --surface-card: rgba(255, 255, 255, 0.94);
       --surface-soft: #f7fafc;
       --text: #1a2331;
       --muted: #667487;
@@ -23,6 +24,14 @@
       --shadow: 0 14px 30px rgba(19, 45, 70, 0.08);
       --radius-lg: 18px;
       --radius-md: 14px;
+      --bg-gradient: linear-gradient(145deg, #f6fbff 0%, #fef9f3 45%, #f4fbf8 100%);
+      --hero-grad: linear-gradient(140deg, #ffffff, #f5fbff 58%, #fff8f2 100%);
+      --step-grad: linear-gradient(160deg, #ffffff, #f8fcff);
+      --detail-grad: linear-gradient(145deg, #fcfeff, #f0f8ff);
+      --status-bg: #e7f4ef;
+      --status-text: #245f47;
+      --chat-user-bg: #e5f3f7;
+      --chat-assistant-bg: #f6f7fb;
     }
 
     * {
@@ -37,7 +46,7 @@
       min-height: 100vh;
       position: relative;
       letter-spacing: 0;
-      background-image: linear-gradient(145deg, #f6fbff 0%, #fef9f3 45%, #f4fbf8 100%);
+      background-image: var(--bg-gradient);
       overflow-x: hidden;
     }
 
@@ -75,13 +84,19 @@
     }
 
     .app {
-      width: min(100%, 440px);
+      width: min(100%, 760px);
       margin: 0 auto;
-      padding: 14px 10px 32px;
+      padding: 16px 12px 36px;
+    }
+
+    @media (max-width: 780px) {
+      .app {
+        width: min(100%, 460px);
+      }
     }
 
     .card {
-      background: rgba(255, 255, 255, 0.94);
+      background: var(--surface-card);
       border: 1px solid var(--border);
       border-radius: var(--radius-lg);
       padding: 14px;
@@ -368,13 +383,68 @@
       border: 1px solid var(--border);
       border-radius: 14px;
       padding: 14px;
-      background: linear-gradient(160deg, #ffffff, #f8fcff);
+      background: var(--step-grad);
       display: grid;
       gap: 8px;
     }
 
     .hero {
-      background: linear-gradient(140deg, #ffffff, #f5fbff 58%, #fff8f2 100%);
+      background: var(--hero-grad);
+    }
+
+    .hero-accent {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      background: linear-gradient(130deg, rgba(17, 122, 139, 0.1), rgba(46, 95, 177, 0.07));
+      margin-top: 12px;
+    }
+
+    .hero-kpis {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin-top: 12px;
+    }
+
+    .kpi-chip {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      background: #fbfdff;
+    }
+
+    .kpi-chip strong {
+      display: block;
+      font-family: "Space Grotesk", "Inter", sans-serif;
+      font-size: 1.12rem;
+      color: #1d3c57;
+    }
+
+    .ai-highlight {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      background: linear-gradient(140deg, #edf9fb, #eef5ff);
+      display: grid;
+      gap: 10px;
+    }
+
+    .role-shell {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+      background: #fcfeff;
+    }
+
+    .role-shell.business {
+      background: linear-gradient(140deg, #eefbf3, #fafdff 65%);
+    }
+
+    .role-shell.nonprofit {
+      background: linear-gradient(140deg, #eef3ff, #fafdff 65%);
     }
 
     .hero h1, .hero h2 { margin: 0 0 10px; }
@@ -410,7 +480,7 @@
 
     .listing-detail {
       border: 1px solid var(--border);
-      background: linear-gradient(145deg, #fcfeff, #f0f8ff);
+      background: var(--detail-grad);
       color: var(--text);
       border-radius: 16px;
       padding: 16px;
@@ -487,8 +557,8 @@
       display: inline-block;
       padding: 4px 10px;
       border-radius: 999px;
-      background: #e7f4ef;
-      color: #245f47;
+      background: var(--status-bg);
+      color: var(--status-text);
       font-size: 12px;
       font-weight: 700;
       text-transform: capitalize;
@@ -533,11 +603,11 @@
     }
 
     .chat-user {
-      background: #e5f3f7;
+      background: var(--chat-user-bg);
       margin-left: auto;
     }
 
-    .chat-assistant { background: #f6f7fb; }
+    .chat-assistant { background: var(--chat-assistant-bg); }
 
     .brand-line {
       color: var(--muted);
@@ -554,6 +624,107 @@
 
       .topbar {
         align-items: flex-start;
+      }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1724;
+        --surface: #111b2b;
+        --surface-card: rgba(17, 27, 43, 0.94);
+        --surface-soft: #172335;
+        --text: #e7eef8;
+        --muted: #a4b3c7;
+        --border: #2a3a50;
+        --brand: #52a7ba;
+        --brand-strong: #387b92;
+        --accent: #ffb282;
+        --org: #8cb3ff;
+        --business: #80d3ab;
+        --shadow: 0 14px 28px rgba(0, 0, 0, 0.36);
+        --bg-gradient: linear-gradient(150deg, #0f1724 0%, #121c2d 52%, #122026 100%);
+        --hero-grad: linear-gradient(145deg, #18273c, #17263b 58%, #1f2d3f 100%);
+        --step-grad: linear-gradient(160deg, #162437, #142133);
+        --detail-grad: linear-gradient(145deg, #16263a, #132033);
+        --status-bg: #1f3a31;
+        --status-text: #97e0bd;
+        --chat-user-bg: #1c3542;
+        --chat-assistant-bg: #1a2335;
+      }
+
+      .bridge-emblem {
+        background: linear-gradient(150deg, #203147, #1a2f44 55%, #293546);
+        border-color: #35506c;
+        box-shadow: inset 0 0 0 1px rgba(231, 238, 248, 0.08), 0 10px 18px rgba(0, 0, 0, 0.3);
+      }
+
+      .brand-wordmark {
+        color: #e7eef8;
+      }
+
+      label {
+        color: #c5d4e8;
+      }
+
+      input,
+      select,
+      textarea {
+        background: #132035;
+        color: #e7eef8;
+        border-color: #2e425d;
+      }
+
+      .btn-alt,
+      .btn-chip,
+      .screen-chip,
+      .listing,
+      .detail-box,
+      .message-bubble,
+      .chat-log,
+      .stat-tile,
+      .listing-detail .detail-box,
+      .result {
+        background: #152338;
+        color: #e7eef8;
+        border-color: #2a3d56;
+      }
+
+      .hero-accent,
+      .kpi-chip,
+      .ai-highlight,
+      .role-shell,
+      .role-shell.business,
+      .role-shell.nonprofit {
+        background: #18283c;
+        border-color: #2f4563;
+        color: #e7eef8;
+      }
+
+      .kpi-chip strong {
+        color: #e1ecfb;
+      }
+
+      .listing:hover {
+        border-color: #4e6a8d;
+      }
+
+      .badge,
+      .listing-detail .badge,
+      .listing-detail .status-badge {
+        background: #26364d;
+        color: #d5e4f8;
+      }
+
+      .private {
+        background: #483326;
+        color: #ffcea8;
+      }
+
+      .role-business { background: #233b32; color: #9de9c2; }
+      .role-organization { background: #243656; color: #b8d0ff; }
+
+      .stat-tile strong {
+        color: #dce8f7;
       }
     }
   </style>
@@ -638,7 +809,11 @@
     async function boot() {
       if (state.token) {
         const me = await api('/api/auth/me');
-        if (me.success) state.user = me.user;
+        if (me.success) {
+          state.user = me.user;
+          state.dashboardSection = defaultDashboardSectionForRole(me.user && me.user.role);
+          state.listingFilter = me.user && me.user.role === 'organization' ? 'supply' : 'all';
+        }
       }
       state.view = state.user ? 'dashboard' : 'auth';
       if (state.user) await refreshData();
@@ -704,6 +879,10 @@
     function roleLabel(role) {
       if (role === 'organization') return 'nonprofit';
       return role || '';
+    }
+
+    function defaultDashboardSectionForRole(role) {
+      return 'overview';
     }
 
     function getFieldValue(id) {
@@ -777,6 +956,8 @@
       localStorage.setItem('cg-token', res.token);
       state.user = res.user;
       state.view = 'dashboard';
+      state.dashboardSection = defaultDashboardSectionForRole(res.user && res.user.role);
+      state.listingFilter = res.user && res.user.role === 'organization' ? 'supply' : 'all';
       state.message = '';
       await refreshData();
       await runQuickRecommend();
@@ -1019,7 +1200,7 @@
       const role = state.user && state.user.role ? state.user.role : 'organization';
       const allowed = role === 'business'
         ? new Set(['overview', 'post', 'board', 'activity', 'ai'])
-        : new Set(['overview', 'post', 'match', 'board', 'activity', 'ai']);
+        : new Set(['overview', 'board', 'match', 'activity', 'ai']);
       state.dashboardSection = allowed.has(section) ? section : 'overview';
       render();
     }
@@ -1308,16 +1489,14 @@
             ['overview', 'Overview'],
             ['post', 'Post offer'],
             ['board', 'Live board'],
-            ['activity', 'Coordination chat'],
-            ['ai', 'AI assistant']
+            ['ai', 'AI assistant'],
+            ['activity', 'Coordination chat']
           ]
         : [
             ['overview', 'Overview'],
-            ['post', 'Post request'],
-            ['match', 'Match'],
-            ['board', 'Live board'],
-            ['activity', 'Coordination chat'],
-            ['ai', 'AI assistant']
+            ['ai', 'AI assistant'],
+            ['board', 'Explore board'],
+            ['activity', 'Coordination chat']
           ];
 
       return `
@@ -1328,21 +1507,35 @@
     }
 
     function renderOverviewPanel(roleIntro, selectedListing) {
+      const nonprofitStepOne = state.user.role === 'organization'
+        ? '<strong>1. Explore live offers</strong><div class="small muted">Review active business offers and open one to inspect full details.</div><div class="inline-actions"><button class="btn" onclick="setDashboardSection(\'board\')">Open explore board</button></div>'
+        : '<strong>1. Post what you can offer</strong><div class="small muted">Create public listings or private offers for nonprofits who need fast help.</div><div class="inline-actions"><button class="btn" onclick="setDashboardSection(\'post\')">Go to posting screen</button></div>';
+
+      const nonprofitStepTwo = state.user.role === 'organization'
+        ? '<strong>2. Ask AI for best fit</strong><div class="small muted">Use your need details and location to get best and closest current options.</div><div class="inline-actions"><button class="btn-alt" onclick="setDashboardSection(\'ai\')">Open AI assistant</button></div>'
+        : '<strong>2. Keep supply visible</strong><div class="small muted">Use the live board and AI assistant to route your offers to the right partners.</div><div class="inline-actions"><button class="btn-alt" onclick="setDashboardSection(\'ai\')">Open AI assistant</button></div>';
+
       return `
         <div class="section-stack">
+          <div class="card ai-highlight">
+            <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start;">
+              <div>
+                <strong>AI assistant is live</strong>
+                <div class="small muted">Ask for best-fit support options from active listings, urgency, location, and role context.</div>
+              </div>
+              <button class="btn" onclick="setDashboardSection('ai')">Open AI assistant</button>
+            </div>
+          </div>
+
           <div class="card">
             <h3 style="margin-top:0;">Your current path</h3>
             <div class="overview-grid">
               <div class="quick-panel">
                 <div class="step-card">
-                  <strong>1. Post what you have or need</strong>
-                  <div class="small muted">Start with a resource, a request, or a private offer depending on your role.</div>
-                  <div class="inline-actions"><button class="btn" onclick="setDashboardSection('post')">Go to posting screen</button></div>
+                  ${nonprofitStepOne}
                 </div>
                 <div class="step-card">
-                  <strong>2. Match it quickly</strong>
-                  <div class="small muted">Use the matching screen to search current listings and recommendations.</div>
-                  <div class="inline-actions"><button class="btn-alt" onclick="setDashboardSection('match')">Open matching screen</button></div>
+                  ${nonprofitStepTwo}
                 </div>
                 <div class="step-card">
                   <strong>3. Keep coordination in one place</strong>
@@ -1360,7 +1553,10 @@
                   <strong>Live focus</strong>
                   <div class="small muted">${escapeHtml(roleIntro)}</div>
                   <div class="small muted">Selected board item: ${selectedListing ? escapeHtml(selectedListing.businessName) : 'No listing selected yet'}</div>
-                  <div class="inline-actions"><button class="btn-alt" onclick="setDashboardSection('board')">Jump to board</button></div>
+                  <div class="inline-actions">
+                    <button class="btn-alt" onclick="setDashboardSection('board')">Jump to board</button>
+                    <button class="btn-alt" onclick="setDashboardSection('ai')">AI assistant</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1370,11 +1566,11 @@
             <h3 style="margin-top:0;">Recommended next actions</h3>
             <div class="row two">
               <div class="detail-box">
-                <div class="small muted">Posting screen</div>
-                <strong>${state.user.role === 'business' ? 'Create listings and send private offers' : 'Create requests and define urgency'}</strong>
+                <div class="small muted">${state.user.role === 'business' ? 'Posting screen' : 'Explore board'}</div>
+                <strong>${state.user.role === 'business' ? 'Create listings and send private offers' : 'Review offers and request what your organization needs'}</strong>
               </div>
               <div class="detail-box">
-                <div class="small muted">Matching screen</div>
+                <div class="small muted">AI assistant</div>
                 <strong>Use live data to get best-fit recommendations</strong>
               </div>
             </div>
@@ -1387,7 +1583,16 @@
       root.innerHTML = `
         <div class="card hero">
           <h1>Welcome to Brisio</h1>
-          <p class="muted">A clean resource marketplace built for real collaboration between businesses and nonprofits.</p>
+          <p class="muted">A professional resource exchange that helps businesses and nonprofits coordinate faster with less friction.</p>
+          <div class="hero-accent">
+            <strong>One platform, two purpose-built paths</strong>
+            <div class="small muted">Businesses focus on posting and delivery coordination. Nonprofits focus on exploring and requesting the right support quickly.</div>
+          </div>
+          <div class="hero-kpis">
+            <div class="kpi-chip"><strong>AI-guided</strong><div class="small muted">Best-fit suggestions from live listings</div></div>
+            <div class="kpi-chip"><strong>Role-based</strong><div class="small muted">Business and nonprofit flows stay distinct</div></div>
+            <div class="kpi-chip"><strong>Traceable</strong><div class="small muted">Status, messaging, and handoff in one place</div></div>
+          </div>
           <div class="hero-actions">
             <span class="badge">Professional dashboard</span>
             <span class="badge">Direct board</span>
@@ -1395,7 +1600,7 @@
           </div>
           <ul class="soft-list">
             <li>Businesses can post offers, set delivery timing, and send private help quickly.</li>
-            <li>Nonprofits can post urgent needs and request best-fit live matches.</li>
+            <li>Nonprofits can explore offers, request support, and use AI to find best-fit matches.</li>
             <li>Recommendations stay tied to live listings, client need details, urgency, location, and current platform signals.</li>
           </ul>
         </div>
@@ -1428,12 +1633,18 @@
 
     function renderDashboard() {
       const roleClass = state.user.role === 'business' ? 'role-business' : 'role-organization';
-      const roleTitle = 'Dashboard';
+      const roleTitle = state.user.role === 'business' ? 'Business Command Center' : 'Nonprofit Exploration Hub';
       const roleIntro = state.user.role === 'business'
         ? 'List available resources, delivery speed, offer close time, and optionally send private offers.'
-        : 'Post urgent needs and ask AI for the best and closest offers.';
+        : 'Explore live offers, request what you need, and use AI to find the best-fit options near you.';
 
       if (state.user.role === 'business' && state.dashboardSection === 'match') {
+        state.dashboardSection = 'board';
+      }
+      if (state.user.role === 'organization' && state.dashboardSection === 'post') {
+        state.dashboardSection = 'board';
+      }
+      if (state.user.role === 'organization' && state.dashboardSection === 'match') {
         state.dashboardSection = 'board';
       }
 
@@ -1495,57 +1706,28 @@
         </div>
       `;
 
-      const nonprofitForm = `
-        <div class="card">
-          <h3>Create nonprofit request</h3>
-          <div class="row two">
-            <div class="field"><label>Category</label><select id="listingCategory">${categoryOptions()}</select></div>
-            <div class="field"><label>Resource name</label><input id="listingResourceName" placeholder="Family meal pickup / PA system / classroom space" /></div>
-            <div class="field"><label>Type needed</label><input id="listingResourceType" placeholder="Halal meals / portable speakers / accessible room" /></div>
-            <div class="field"><label>Quantity or capacity needed</label><input id="listingQuantity" placeholder="60 meals / 1 sound system / room for 25" /></div>
-            <div class="field">
-              <label>Urgency</label>
-              <select id="listingUrgency">
-                <option value="low">Low</option>
-                <option value="medium" selected>Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
-            </div>
-            <div class="field"><label>Contact</label><input id="listingContact" /></div>
-            <div class="field"><label>Street address</label><input id="listingStreet" placeholder="123 Main St" /></div>
-            <div class="field"><label>City</label><input id="listingCity" placeholder="Austin" /></div>
-            <div class="field"><label>State</label><input id="listingState" placeholder="TX" /></div>
-            <div class="field"><label>ZIP code</label><input id="listingZip" placeholder="78701" /></div>
-          </div>
-          <div class="field"><label>Availability notes</label><input id="listingAvailabilityNotes" placeholder="Need elevator access, arrival after school hours, refrigeration preferred" /></div>
-          <div class="field"><label>Need description</label><textarea id="listingDescription"></textarea></div>
-          <button class="btn" onclick="submitListing()">Post request</button>
-        </div>
-        <div class="card">
-          <h3>AI best + closest match</h3>
-          <p class="small muted">This uses current listings plus need context such as urgency, timing, and location. No invented data.</p>
-          <div class="row two">
-            <div class="field"><label>Your need</label><textarea id="needText" placeholder="Need 60 boxed meals by tomorrow morning"></textarea></div>
-            <div class="field"><label>Preferred location</label><input id="needLocation" value="${escapeHtml(state.user.location || '')}" /></div>
-          </div>
-          <button class="btn" onclick="findBestMatch()">Find best match</button>
-          ${renderBestMatchResult()}
-        </div>
-      `;
-
       let sectionContent = '';
       if (state.dashboardSection === 'overview') {
         sectionContent = renderOverviewPanel(roleIntro, selectedListing);
       } else if (state.dashboardSection === 'post') {
         sectionContent = `
           <div class="section-stack">
-            ${state.user.role === 'business' ? businessForm : nonprofitForm}
+            ${businessForm}
           </div>
         `;
       } else if (state.dashboardSection === 'match') {
-        sectionContent = `
+        sectionContent = state.user.role === 'organization' ? `
           <div class="section-stack">
+            <div class="card">
+              <h3 style="margin-top:0;">AI best + closest match</h3>
+              <p class="small muted">This uses current listings plus need context such as urgency, timing, and location. No invented data.</p>
+              <div class="row two">
+                <div class="field"><label>Your need</label><textarea id="needText" placeholder="Need 60 boxed meals by tomorrow morning"></textarea></div>
+                <div class="field"><label>Preferred location</label><input id="needLocation" value="${escapeHtml(state.user.location || '')}" /></div>
+              </div>
+              <button class="btn" onclick="findBestMatch()">Find best match</button>
+              ${renderBestMatchResult()}
+            </div>
             <div class="card">
               <h3 style="margin-top:0;">Quick match search</h3>
               <p class="small muted">Search the current listings directly by text.</p>
@@ -1554,17 +1736,18 @@
               <div style="margin-top:12px;">${legacyMatchesHtml}</div>
             </div>
           </div>
-        `;
+        ` : '<div class="card"><h3 style="margin-top:0;">Match</h3><p class="small muted">Business users can use the AI assistant and live board to prioritize where to help next.</p><div class="inline-actions"><button class="btn" onclick="setDashboardSection(\'ai\')">Open AI assistant</button><button class="btn-alt" onclick="setDashboardSection(\'board\')">Open live board</button></div></div>';
       } else if (state.dashboardSection === 'board') {
+        const isNonprofit = state.user.role === 'organization';
         sectionContent = `
           <div class="card">
-            <h3>Live board</h3>
-            <p class="small muted">Click an offer or request to open the full record, then switch between all, offers, and requests.</p>
-            <div class="board-toolbar">
+            <h3>${isNonprofit ? 'Explore available offers' : 'Live board'}</h3>
+            <p class="small muted">${isNonprofit ? 'Browse business offers and open any item to request support.' : 'Click an offer or request to open the full record, then switch between all, offers, and requests.'}</p>
+            ${isNonprofit ? '' : `<div class="board-toolbar">
               <button class="btn-chip ${state.listingFilter === 'all' ? 'active' : ''}" onclick="setListingFilter('all')">All active</button>
               <button class="btn-chip ${state.listingFilter === 'supply' ? 'active' : ''}" onclick="setListingFilter('supply')">Offers</button>
               <button class="btn-chip ${state.listingFilter === 'demand' ? 'active' : ''}" onclick="setListingFilter('demand')">Requests</button>
-            </div>
+            </div>`}
             <div class="board-shell">
               <div>
                 ${boardListings.length ? boardListings.map(renderListing).join('') : '<div class="muted">No listings match this view.</div>'}
@@ -1605,6 +1788,18 @@
               <div><span class="pill ${roleClass}">${roleLabel(state.user.role)}</span></div>
               <h2 style="margin:6px 0 0;">${roleTitle}</h2>
               <div class="muted">Welcome, ${escapeHtml(state.user.displayName)}. ${roleIntro}</div>
+              <div class="role-shell ${state.user.role === 'business' ? 'business' : 'nonprofit'}">
+                <strong>${state.user.role === 'business' ? 'Business path' : 'Nonprofit path'}</strong>
+                <div class="small muted">
+                  ${state.user.role === 'business'
+                    ? 'Create listings, share delivery timing, and route resources publicly or privately.'
+                    : 'Explore available offers, request support, and keep all coordination in one place.'}
+                </div>
+              </div>
+              <div class="inline-actions">
+                <button class="btn" onclick="setDashboardSection('ai')">Open AI assistant</button>
+                <button class="btn-alt" onclick="setDashboardSection('board')">${state.user.role === 'business' ? 'Open live board' : 'Open explore board'}</button>
+              </div>
             </div>
             <button class="btn-alt" onclick="logout()">Sign out</button>
           </div>

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ApiListing, getListings } from '@/constants/api';
+import { ApiListing, blockUser, getListings, reportListing } from '@/constants/api';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
 import { useTheme } from '@/hooks/use-theme';
@@ -16,6 +16,8 @@ function ExploreContent() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
+  const [actionLoadingId, setActionLoadingId] = useState('');
   const [listings, setListings] = useState<ApiListing[]>([]);
 
   const insets = {
@@ -40,6 +42,7 @@ function ExploreContent() {
     if (!session.token) return;
     setLoading(true);
     setError('');
+    setStatusMessage('');
     try {
       const result = await getListings(session.token);
       setListings(result.listings || []);
@@ -49,6 +52,50 @@ function ExploreContent() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleReport(item: ApiListing, reason: string) {
+    if (!session.token) return;
+    setActionLoadingId(item.id);
+    setError('');
+    setStatusMessage('');
+    try {
+      await reportListing(session.token, {
+        listingId: item.id,
+        reason,
+        details: `${item.businessName} | ${item.description}`,
+      });
+      setStatusMessage('Report submitted.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not submit report');
+    } finally {
+      setActionLoadingId('');
+    }
+  }
+
+  async function handleBlock(item: ApiListing) {
+    if (!session.token) return;
+    setActionLoadingId(item.id);
+    setError('');
+    setStatusMessage('');
+    try {
+      await blockUser(session.token, { blockedUserId: item.ownerUserId });
+      setStatusMessage('Blocked this user. Their listings are now hidden.');
+      await loadData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not block user');
+    } finally {
+      setActionLoadingId('');
+    }
+  }
+
+  function openReportMenu(item: ApiListing) {
+    Alert.alert('Report listing', 'Choose the reason that best matches this listing.', [
+      { text: 'Spam', onPress: () => void handleReport(item, 'Spam') },
+      { text: 'Inappropriate', onPress: () => void handleReport(item, 'Inappropriate content') },
+      { text: 'Harassment', onPress: () => void handleReport(item, 'Harassment') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
 
   useEffect(() => {
@@ -115,6 +162,7 @@ function ExploreContent() {
               <Pressable style={styles.refreshBtn} onPress={loadData}>
                 <ThemedText type="smallBold">Refresh</ThemedText>
               </Pressable>
+              {!!statusMessage && <ThemedText style={styles.statusText}>{statusMessage}</ThemedText>}
               {!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
             </ThemedView>
 
@@ -137,6 +185,22 @@ function ExploreContent() {
                     </ThemedText>
                     <ThemedText type="small">{item.description}</ThemedText>
                     <ThemedText type="small">{item.location || 'Location not set'}</ThemedText>
+                    {item.ownerUserId !== session.user?.id ? (
+                      <ThemedView style={styles.actionRow}>
+                        <Pressable
+                          style={[styles.actionBtn, actionLoadingId === item.id && styles.actionBtnDisabled]}
+                          onPress={() => openReportMenu(item)}
+                          disabled={actionLoadingId === item.id}>
+                          <ThemedText type="smallBold">Report</ThemedText>
+                        </Pressable>
+                        <Pressable
+                          style={[styles.actionBtn, styles.blockBtn, actionLoadingId === item.id && styles.actionBtnDisabled]}
+                          onPress={() => handleBlock(item)}
+                          disabled={actionLoadingId === item.id}>
+                          <ThemedText type="smallBold">Block</ThemedText>
+                        </Pressable>
+                      </ThemedView>
+                    ) : null}
                   </ThemedView>
                 ))
               )}
@@ -213,6 +277,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     gap: Spacing.one,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    paddingTop: Spacing.one,
+  },
+  actionBtn: {
+    flex: 1,
+    alignItems: 'center',
+    borderRadius: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderWidth: 1,
+    borderColor: '#C7D0DD',
+    backgroundColor: '#FFFFFF',
+  },
+  blockBtn: {
+    backgroundColor: '#FFF5F3',
+    borderColor: '#E8B7AE',
+  },
+  actionBtnDisabled: {
+    opacity: 0.6,
+  },
+  statusText: {
+    color: '#1C6B47',
   },
   errorText: {
     color: '#B54840',

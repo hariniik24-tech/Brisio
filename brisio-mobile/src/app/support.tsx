@@ -1,40 +1,80 @@
-import { ScrollView, StyleSheet } from 'react-native';
-import { Link } from 'expo-router';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 
+import { StackScreenShell } from '@/components/stack-screen-shell';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 
 export default function SupportScreen() {
+  const router = useRouter();
+
+  async function callSupport() {
+    const url = 'tel:5315419424';
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    }
+  }
+
+  async function emailSupport() {
+    const subject = encodeURIComponent('Brisio support request');
+    const body = encodeURIComponent('Hi, I need help with Brisio.');
+    const url = `mailto:brisiohelp@gmail.com?subject=${subject}&body=${body}`;
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    }
+  }
+
   return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <ThemedView style={styles.container}>
-        <Link href="/" asChild>
+    <StackScreenShell>
+        <Pressable onPress={() => router.push('/')} style={styles.backBtn} hitSlop={10}>
           <ThemedText type="smallBold">Back to Home</ThemedText>
-        </Link>
+        </Pressable>
         <ThemedText type="subtitle">Support</ThemedText>
-        <ThemedText type="small">Contact: support@brisio.app</ThemedText>
-        <ThemedText type="small">
-          For App Review, use the supplied reviewer account to create an account and test both
-          business and nonprofit flows.
-        </ThemedText>
+        <ThemedText type="small">Need help? Contact support directly:</ThemedText>
+        <Pressable onPress={callSupport} style={styles.inlineContact} hitSlop={12}>
+          <Text style={styles.inlineContactText}>Phone: 531-541-9424</Text>
+        </Pressable>
+        <Pressable onPress={emailSupport} style={styles.inlineContact} hitSlop={12}>
+          <Text style={styles.inlineContactText}>Email: brisiohelp@gmail.com</Text>
+        </Pressable>
+        <View style={styles.contactRow}>
+          <Pressable style={styles.contactBtn} onPress={callSupport} hitSlop={12}>
+            <ThemedText type="smallBold">Call 531-541-9424</ThemedText>
+          </Pressable>
+          <Pressable style={styles.contactBtn} onPress={emailSupport} hitSlop={12}>
+            <ThemedText type="smallBold">Email brisiohelp@gmail.com</ThemedText>
+          </Pressable>
+        </View>
         <ThemedText type="small">
           If a feature requires location, allow it on device so nearby listings and distance-based
           matching can work correctly.
         </ThemedText>
-      </ThemedView>
-    </ScrollView>
+    </StackScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    padding: Spacing.four,
-    alignItems: 'center',
+  contactRow: {
+    gap: Spacing.two,
   },
-  container: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    gap: Spacing.three,
+  inlineContact: {
+    alignSelf: 'flex-start',
+  },
+  inlineContactText: {
+    color: '#2E5E96',
+    textDecorationLine: 'underline',
+  },
+  backBtn: {
+    alignSelf: 'flex-start',
+  },
+  contactBtn: {
+    borderWidth: 1,
+    borderColor: '#CFD9E6',
+    borderRadius: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    backgroundColor: '#F8FBFF',
   },
 });

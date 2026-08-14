@@ -59,6 +59,24 @@ CREATE TABLE IF NOT EXISTS reports (
   createdAt TEXT NOT NULL
 );
 
+-- Create blocks table
+CREATE TABLE IF NOT EXISTS blocks (
+  id TEXT PRIMARY KEY,
+  blockerUserId TEXT NOT NULL,
+  blockedUserId TEXT NOT NULL,
+  createdAt TEXT NOT NULL
+);
+
+-- Create password reset tokens table
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id TEXT PRIMARY KEY,
+  userId TEXT NOT NULL,
+  codeHash TEXT NOT NULL,
+  createdAt TEXT NOT NULL,
+  expiresAt TEXT NOT NULL,
+  usedAt TEXT
+);
+
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
@@ -90,3 +108,6 @@ CREATE INDEX IF NOT EXISTS idx_engagements_listingOwnerId ON engagements(listing
 CREATE INDEX IF NOT EXISTS idx_engagement_messages_engagementId ON engagement_messages(engagementId);
 CREATE INDEX IF NOT EXISTS idx_sessions_userId ON sessions(userId);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_blocks_blockerUserId ON blocks(blockerUserId);
+CREATE INDEX IF NOT EXISTS idx_blocks_blockedUserId ON blocks(blockedUserId);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_userId ON password_reset_tokens(userId);

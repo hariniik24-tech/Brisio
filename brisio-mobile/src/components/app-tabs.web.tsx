@@ -78,11 +78,15 @@ export function CustomTabList(props: TabListProps) {
 const styles = StyleSheet.create({
   tabListContainer: {
     position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     width: '100%',
     padding: Spacing.three,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
+    zIndex: 20,
   },
   innerContainer: {
     paddingVertical: Spacing.two,

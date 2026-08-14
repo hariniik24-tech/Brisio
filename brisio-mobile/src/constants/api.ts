@@ -137,6 +137,13 @@ export async function requestPasswordReset(input: { email: string }) {
   });
 }
 
+export async function verifyPasswordResetCode(input: { email: string; resetCode: string }) {
+  return apiRequest<{ success: true; message: string }>('/api/auth/verify-reset-code', {
+    method: 'POST',
+    body: input,
+  });
+}
+
 export async function confirmPasswordReset(input: { email: string; resetCode: string; password: string }) {
   return apiRequest<{ success: true; message: string }>('/api/auth/reset-password', {
     method: 'POST',

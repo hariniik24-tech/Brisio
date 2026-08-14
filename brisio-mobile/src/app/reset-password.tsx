@@ -21,26 +21,32 @@ function getPasswordPolicyError(password: string) {
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ email?: string }>();
+  const params = useLocalSearchParams<{ email?: string; code?: string }>();
   const initialEmail = useMemo(() => {
     const value = Array.isArray(params.email) ? params.email[0] : params.email;
     return value || '';
   }, [params.email]);
+  const initialCode = useMemo(() => {
+    const value = Array.isArray(params.code) ? params.code[0] : params.code;
+    return value || '';
+  }, [params.code]);
 
-  const [email, setEmail] = useState(initialEmail);
-  const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
   async function handleResetPassword() {
-    const trimmedEmail = email.trim();
-    const trimmedCode = resetCode.trim();
+    const trimmedEmail = initialEmail.trim();
+    const trimmedCode = initialCode.trim();
     const passwordError = getPasswordPolicyError(newPassword);
 
-    if (!trimmedEmail || !trimmedCode || !newPassword.trim()) {
-      setMessage('Fill in the email, reset code, and new password.');
+    if (!trimmedEmail || !trimmedCode) {
+      setMessage('Verification session expired. Start again from Forgot Password.');
+      return;
+    }
+    if (!newPassword.trim()) {
+      setMessage('Enter and confirm your new password.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -77,28 +83,8 @@ export default function ResetPasswordScreen() {
       <Pressable onPress={() => router.push('/forgot-password')} style={styles.backBtn} hitSlop={10}>
         <ThemedText type="smallBold">Back</ThemedText>
       </Pressable>
-      <ThemedText type="subtitle">Enter Code and New Password</ThemedText>
-      <ThemedText type="small">Use the reset code from your email to set your new password.</ThemedText>
-
-      <ThemedText type="small" style={styles.label}>Email</ThemedText>
-      <TextInput
-        style={styles.input}
-        placeholder="name@email.com"
-        placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-      />
-
-      <ThemedText type="small" style={styles.label}>Reset code</ThemedText>
-      <TextInput
-        style={styles.input}
-        placeholder="Enter reset code"
-        placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-        value={resetCode}
-        onChangeText={setResetCode}
-      />
+      <ThemedText type="subtitle">Set New Password</ThemedText>
+      <ThemedText type="small">Your verification code was accepted. Enter your new password.</ThemedText>
 
       <ThemedText type="small" style={styles.label}>New password</ThemedText>
       <TextInput

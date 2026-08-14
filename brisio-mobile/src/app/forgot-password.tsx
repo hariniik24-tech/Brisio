@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StackScreenShell } from '@/components/stack-screen-shell';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { requestPasswordReset } from '@/constants/api';
+import { requestPasswordReset, verifyPasswordResetCode } from '@/constants/api';
 
 const INPUT_PLACEHOLDER_COLOR = '#6A7685';
 
@@ -18,9 +18,10 @@ export default function ForgotPasswordScreen() {
   }, [params.email]);
 
   const [email, setEmail] = useState(initialEmail);
+  const [resetCode, setResetCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
-  const [canContinue, setCanContinue] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
 
   async function handleSendCode() {
     const trimmedEmail = email.trim();
@@ -34,25 +35,42 @@ export default function ForgotPasswordScreen() {
     try {
       const response = await requestPasswordReset({ email: trimmedEmail });
       setMessage(response.message || 'If the email exists, a reset code has been sent.');
-      setCanContinue(true);
-    } catch {
-      setMessage('If the email exists, a reset code has been sent.');
-      setCanContinue(true);
+      setCodeSent(true);
+    } catch (err) {
+      setMessage(err instanceof Error && err.message ? err.message : 'Unable to send reset code right now.');
+      setCodeSent(false);
     } finally {
       setBusy(false);
     }
   }
 
-  function continueToReset() {
+  async function continueToReset() {
     const trimmedEmail = email.trim();
+    const trimmedCode = resetCode.trim();
     if (!trimmedEmail) {
       setMessage('Enter your email to continue.');
       return;
     }
+    if (!trimmedCode) {
+      setMessage('Enter the verification code sent to your email.');
+      return;
+    }
+
+    setBusy(true);
+    setMessage('');
+    try {
+      await verifyPasswordResetCode({ email: trimmedEmail, resetCode: trimmedCode });
+    } catch (err) {
+      setMessage(err instanceof Error && err.message ? err.message : 'Invalid verification code.');
+      setBusy(false);
+      return;
+    }
+
     router.push({
       pathname: '/reset-password',
-      params: { email: trimmedEmail },
+      params: { email: trimmedEmail, code: trimmedCode },
     });
+    setBusy(false);
   }
 
   return (
@@ -80,11 +98,25 @@ export default function ForgotPasswordScreen() {
           {busy ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Send reset code</ThemedText>}
         </Pressable>
 
+        {codeSent ? (
+          <>
+            <ThemedText type="small" style={styles.label}>Verification code</ThemedText>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter code from email"
+              placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+              keyboardType="number-pad"
+              value={resetCode}
+              onChangeText={setResetCode}
+            />
+          </>
+        ) : null}
+
         <Pressable
-          style={[styles.primaryBtn, !canContinue && styles.primaryBtnDisabled]}
+          style={[styles.primaryBtn, (!codeSent || busy) && styles.primaryBtnDisabled]}
           onPress={continueToReset}
-          disabled={!canContinue}>
-          <ThemedText type="smallBold">Continue to code entry</ThemedText>
+          disabled={!codeSent || busy}>
+          {busy ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Verify code and continue</ThemedText>}
         </Pressable>
 
         {!!message ? <ThemedText type="small">{message}</ThemedText> : null}
@@ -98,7 +130,10 @@ export default function ForgotPasswordScreen() {
             2. Check your email for the reset code.
           </ThemedText>
           <ThemedText type="small">
-            3. Continue to the next screen and set a new password.
+            3. Enter that code here to verify your identity.
+          </ThemedText>
+          <ThemedText type="small">
+            4. After verification, you can set and confirm a new password.
           </ThemedText>
         </View>
     </StackScreenShell>

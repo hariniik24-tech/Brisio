@@ -142,23 +142,55 @@ async function sendResetCodeEmail({ to, resetCode, expiresAt }) {
   const mailer = getResetMailer();
   if (!mailer) {
     appendInstrumentation({ type: 'forgot-password-email-skipped', reason: 'smtp-not-configured', email: to });
-    return false;
+    return { sent: false, reason: 'smtp-not-configured' };
   }
 
   const expiresText = new Date(expiresAt).toLocaleString('en-US', { timeZone: 'UTC', timeZoneName: 'short' });
   try {
-    await mailer.sendMail({
+    const info = await mailer.sendMail({
       from: resetEmailFrom,
       to,
       subject: 'Your Brisio password reset code',
       text: `Your Brisio reset code is ${resetCode}. This code expires at ${expiresText}. If you did not request this, you can ignore this email.`,
     });
-    return true;
+    appendInstrumentation({
+      type: 'forgot-password-email-sent',
+      email: to,
+      messageId: String(info?.messageId || ''),
+      response: String(info?.response || ''),
+    });
+    return { sent: true, messageId: String(info?.messageId || ''), response: String(info?.response || '') };
   } catch (error) {
     console.error('Reset email send error:', error);
     appendInstrumentation({ type: 'forgot-password-email-failed', email: to, error: String(error?.message || error) });
-    return false;
+    return { sent: false, reason: String(error?.message || error) };
   }
+}
+
+async function getActiveResetTokenForUser(userId) {
+  const { data: tokens, error: tokenError } = await supabase
+    .from('password_reset_tokens')
+    .select('*')
+    .eq('userId', userId)
+    .eq('usedAt', null)
+    .order('createdAt', { ascending: false })
+    .limit(1);
+
+  if (tokenError) {
+    return { error: tokenError };
+  }
+
+  const tokenRow = tokens && tokens[0];
+  if (!tokenRow) {
+    return { validationError: 'No active reset code found' };
+  }
+
+  const expiresAt = new Date(getFirstDefined(tokenRow, ['expiresAt', 'expiresat'])).getTime();
+  if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) {
+    return { validationError: 'Reset code expired' };
+  }
+
+  return { tokenRow };
 }
 
 async function issueSession(userId) {
@@ -1068,7 +1100,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       return res.status(500).json({ success: false, error: explainSupabaseError(insertError) });
     }
 
-    const emailSent = await sendResetCodeEmail({
+    const emailResult = await sendResetCodeEmail({
       to: user.email,
       resetCode,
       expiresAt,
@@ -1078,8 +1110,16 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       type: 'forgot-password',
       userId: user.id,
       email: user.email,
-      emailSent,
+      emailSent: Boolean(emailResult?.sent),
     });
+
+    if (!emailResult?.sent) {
+      await clearExistingResetTokens(user.id);
+      return res.status(500).json({
+        success: false,
+        error: 'Unable to send reset code email right now. Please try again in a minute.',
+      });
+    }
 
     const payload = {
       success: true,
@@ -1093,6 +1133,45 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     res.json(payload);
   } catch (err) {
     console.error('Forgot password error:', err);
+    res.status(500).json({ success: false, error: explainSupabaseError(err) });
+  }
+});
+
+app.post('/api/auth/verify-reset-code', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const resetCode = String(req.body?.resetCode || '').trim();
+
+    if (!email || !resetCode) {
+      return res.status(400).json({ success: false, error: 'email and resetCode are required' });
+    }
+
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('email', email)
+      .single();
+
+    if (userError || !user) {
+      return res.status(400).json({ success: false, error: 'Invalid reset code' });
+    }
+
+    const { tokenRow, error: tokenError, validationError } = await getActiveResetTokenForUser(user.id);
+    if (tokenError) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(tokenError) });
+    }
+    if (validationError) {
+      return res.status(400).json({ success: false, error: validationError });
+    }
+
+    const expectedHash = getFirstDefined(tokenRow, ['codeHash', 'codehash']);
+    if (hashResetCode(resetCode) !== expectedHash) {
+      return res.status(400).json({ success: false, error: 'Invalid reset code' });
+    }
+
+    res.json({ success: true, message: 'Reset code verified.' });
+  } catch (err) {
+    console.error('Verify reset code error:', err);
     res.status(500).json({ success: false, error: explainSupabaseError(err) });
   }
 });
@@ -1122,26 +1201,12 @@ app.post('/api/auth/reset-password', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid reset code' });
     }
 
-    const { data: tokens, error: tokenError } = await supabase
-      .from('password_reset_tokens')
-      .select('*')
-      .eq('userId', user.id)
-      .eq('usedAt', null)
-      .order('createdAt', { ascending: false })
-      .limit(1);
-
+    const { tokenRow, error: tokenError, validationError } = await getActiveResetTokenForUser(user.id);
     if (tokenError) {
       return res.status(500).json({ success: false, error: explainSupabaseError(tokenError) });
     }
-
-    const tokenRow = tokens && tokens[0];
-    if (!tokenRow) {
-      return res.status(400).json({ success: false, error: 'No active reset code found' });
-    }
-
-    const expiresAt = new Date(getFirstDefined(tokenRow, ['expiresAt', 'expiresat'])).getTime();
-    if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) {
-      return res.status(400).json({ success: false, error: 'Reset code expired' });
+    if (validationError) {
+      return res.status(400).json({ success: false, error: validationError });
     }
 
     const expectedHash = getFirstDefined(tokenRow, ['codeHash', 'codehash']);

@@ -26,14 +26,22 @@ if (!supabaseUrl || !supabaseAnonKey || !/^https?:\/\//i.test(String(supabaseUrl
 const supabaseServerKey = supabaseServiceRoleKey || supabaseAnonKey;
 const supabase = createClient(supabaseUrl, supabaseServerKey);
 
-const smtpHost = String(process.env.SMTP_HOST || '').trim();
-const smtpPort = Number(process.env.SMTP_PORT || '587');
-const smtpSecureRaw = String(process.env.SMTP_SECURE || '').trim().toLowerCase();
+function normalizeEnvString(value) {
+  return String(value || '').trim().replace(/^['"]|['"]$/g, '');
+}
+
+function normalizeEnvSecret(value) {
+  return normalizeEnvString(value).replace(/\s+/g, '');
+}
+
+const smtpHost = normalizeEnvString(process.env.SMTP_HOST);
+const smtpPort = Number(normalizeEnvString(process.env.SMTP_PORT) || '587');
+const smtpSecureRaw = normalizeEnvString(process.env.SMTP_SECURE).toLowerCase();
 const smtpSecure = smtpSecureRaw ? smtpSecureRaw === 'true' : smtpPort === 465;
-const smtpUser = String(process.env.SMTP_USER || '').trim();
-const smtpPass = String(process.env.SMTP_PASS || '').replace(/\s+/g, '').trim();
-const resetEmailFrom = String(process.env.RESET_EMAIL_FROM || smtpUser || '').trim();
-const includeResetCodeInResponse = String(process.env.INCLUDE_RESET_CODE_IN_RESPONSE || '').trim().toLowerCase() === 'true';
+const smtpUser = normalizeEnvString(process.env.SMTP_USER);
+const smtpPass = normalizeEnvSecret(process.env.SMTP_PASS);
+const resetEmailFrom = normalizeEnvString(process.env.RESET_EMAIL_FROM || smtpUser || '');
+const includeResetCodeInResponse = normalizeEnvString(process.env.INCLUDE_RESET_CODE_IN_RESPONSE).toLowerCase() === 'true';
 
 let resetMailer = null;
 
@@ -136,6 +144,14 @@ function getResetMailer() {
       pass: smtpPass,
     },
   });
+
+  resetMailer.verify((error) => {
+    if (error) {
+      console.error('Reset mailer verification failed:', error);
+      appendInstrumentation({ type: 'forgot-password-email-verification-failed', error: String(error?.message || error) });
+    }
+  });
+
   return resetMailer;
 }
 

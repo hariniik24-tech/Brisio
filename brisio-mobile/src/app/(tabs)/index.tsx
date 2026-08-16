@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ApiListing, createListing, getListings, requestListingEngagement } from '@/constants/api';
+import { ApiListing, createListing, getDonationImpactSummary, getListings, requestListingEngagement } from '@/constants/api';
 import { API_BASE_URL } from '@/constants/config';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
@@ -17,6 +17,13 @@ type Stats = {
   supply: number;
   demand: number;
   reports: number;
+};
+
+type DonationSummary = {
+  itemsDonated: number;
+  estimatedInventoryValue: number;
+  recipientCount: number;
+  completedPickups: number;
 };
 
 type ListingForm = {
@@ -32,6 +39,12 @@ type ListingForm = {
 };
 
 const emptyStats: Stats = { total: 0, supply: 0, demand: 0, reports: 0 };
+const emptyDonationSummary: DonationSummary = {
+  itemsDonated: 0,
+  estimatedInventoryValue: 0,
+  recipientCount: 0,
+  completedPickups: 0,
+};
 const initialForm: ListingForm = {
   category: 'other',
   description: '',
@@ -58,6 +71,10 @@ export default function HomeScreen() {
   const [listings, setListings] = useState<ApiListing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(false);
   const [chatBusyListingId, setChatBusyListingId] = useState('');
+  const [donationSummary, setDonationSummary] = useState<DonationSummary>(emptyDonationSummary);
+  const [donationSummaryLoading, setDonationSummaryLoading] = useState(false);
+  const [donationSummaryError, setDonationSummaryError] = useState('');
+  const [donationSummaryUpdatedAt, setDonationSummaryUpdatedAt] = useState('');
 
   const [form, setForm] = useState<ListingForm>(initialForm);
   const [formError, setFormError] = useState('');
@@ -103,6 +120,27 @@ export default function HomeScreen() {
       setListings([]);
     } finally {
       setListingsLoading(false);
+    }
+  }
+
+  async function loadDonationSummary() {
+    if (!session.token || !session.isAuthenticated) return;
+    setDonationSummaryLoading(true);
+    setDonationSummaryError('');
+    try {
+      const response = await getDonationImpactSummary(session.token);
+      setDonationSummary(response.summary || emptyDonationSummary);
+      setDonationSummaryUpdatedAt(new Date().toISOString());
+    } catch (err) {
+      setDonationSummary(emptyDonationSummary);
+      const message = err instanceof Error ? err.message : 'Could not load donation summary.';
+      setDonationSummaryError(
+        message.includes('Backend route is unavailable')
+          ? 'Donation metrics endpoint is not live on the backend yet. Please redeploy the API service.'
+          : message
+      );
+    } finally {
+      setDonationSummaryLoading(false);
     }
   }
 
@@ -152,6 +190,35 @@ export default function HomeScreen() {
     })();
     return () => {
       isActive = false;
+    };
+  }, [session.isAuthenticated, session.token]);
+
+  useEffect(() => {
+    if (!session.isAuthenticated || !session.token) return;
+    let active = true;
+    (async () => {
+      setDonationSummaryLoading(true);
+      setDonationSummaryError('');
+      try {
+        const response = await getDonationImpactSummary(session.token);
+        if (!active) return;
+        setDonationSummary(response.summary || emptyDonationSummary);
+        setDonationSummaryUpdatedAt(new Date().toISOString());
+      } catch (err) {
+        if (!active) return;
+        setDonationSummary(emptyDonationSummary);
+        const message = err instanceof Error ? err.message : 'Could not load donation summary.';
+        setDonationSummaryError(
+          message.includes('Backend route is unavailable')
+            ? 'Donation metrics endpoint is not live on the backend yet. Please redeploy the API service.'
+            : message
+        );
+      } finally {
+        if (active) setDonationSummaryLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
     };
   }, [session.isAuthenticated, session.token]);
 
@@ -328,6 +395,20 @@ export default function HomeScreen() {
                     <ThemedText type="smallBold">Open private chats</ThemedText>
                   </Pressable>
                 </Link>
+                {session.user.role === 'business' ? (
+                  <Link href="/donate-inventory" asChild>
+                    <Pressable style={styles.secondaryBtn}>
+                      <ThemedText type="smallBold">Open donate inventory</ThemedText>
+                    </Pressable>
+                  </Link>
+                ) : null}
+                {session.user.role === 'organization' ? (
+                  <Link href="/donation-inbox" asChild>
+                    <Pressable style={styles.secondaryBtn}>
+                      <ThemedText type="smallBold">Open donation inbox</ThemedText>
+                    </Pressable>
+                  </Link>
+                ) : null}
                 <Pressable style={styles.secondaryBtn} onPress={session.signOut}>
                   <ThemedText type="smallBold">Sign out</ThemedText>
                 </Pressable>
@@ -472,6 +553,60 @@ export default function HomeScreen() {
                     </ThemedView>
                   ))
                 )}
+              </ThemedView>
+
+              <ThemedView type="backgroundElement" style={styles.panel}>
+                <ThemedText type="smallBold">Donation impact summary</ThemedText>
+                {donationSummaryLoading ? (
+                  <ThemedView style={styles.loadingRow}>
+                    <ActivityIndicator size="small" />
+                    <ThemedText type="small">Loading donation metrics...</ThemedText>
+                  </ThemedView>
+                ) : (
+                  <ThemedText type="small">
+                    {session.user.role === 'business'
+                      ? 'Business view: track inventory value and completed pickups.'
+                      : 'Nonprofit view: track received supply and partner coverage.'}
+                  </ThemedText>
+                )}
+
+                {!!donationSummaryError && <ThemedText style={styles.errorText}>{donationSummaryError}</ThemedText>}
+                {!donationSummaryLoading && !!donationSummaryUpdatedAt ? (
+                  <ThemedText type="small" style={styles.helperText}>
+                    Last refreshed: {new Date(donationSummaryUpdatedAt).toLocaleString()}
+                  </ThemedText>
+                ) : null}
+
+                <ThemedView style={styles.impactGrid}>
+                  <ThemedView style={styles.impactTile}>
+                    <ThemedText type="small">
+                      {session.user.role === 'business' ? 'Items donated' : 'Items in pipeline'}
+                    </ThemedText>
+                    <ThemedText type="smallBold">{donationSummary.itemsDonated}</ThemedText>
+                  </ThemedView>
+                  <ThemedView style={styles.impactTile}>
+                    <ThemedText type="small">
+                      {session.user.role === 'business' ? 'Inventory value (USD)' : 'Shared value (USD)'}
+                    </ThemedText>
+                    <ThemedText type="smallBold">{donationSummary.estimatedInventoryValue.toFixed(2)}</ThemedText>
+                  </ThemedView>
+                  <ThemedView style={styles.impactTile}>
+                    <ThemedText type="small">
+                      {session.user.role === 'business' ? 'Recipients served' : 'Donor partners'}
+                    </ThemedText>
+                    <ThemedText type="smallBold">{donationSummary.recipientCount}</ThemedText>
+                  </ThemedView>
+                  <ThemedView style={styles.impactTile}>
+                    <ThemedText type="small">
+                      {session.user.role === 'business' ? 'Completed pickups' : 'Confirmed handoffs'}
+                    </ThemedText>
+                    <ThemedText type="smallBold">{donationSummary.completedPickups}</ThemedText>
+                  </ThemedView>
+                </ThemedView>
+
+                <Pressable style={styles.secondaryBtn} onPress={loadDonationSummary}>
+                  <ThemedText type="smallBold">Refresh donation metrics</ThemedText>
+                </Pressable>
               </ThemedView>
             </>
           )}
@@ -760,6 +895,22 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.two,
     paddingBottom: Spacing.three,
+  },
+  impactGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  impactTile: {
+    width: '48%',
+    minWidth: 140,
+    borderRadius: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    gap: Spacing.one,
+    borderWidth: 1,
+    borderColor: '#D8E4F1',
+    backgroundColor: '#F7FBFF',
   },
   statTile: {
     width: '48%',

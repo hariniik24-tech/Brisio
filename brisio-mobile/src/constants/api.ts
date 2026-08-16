@@ -69,6 +69,55 @@ export type ApiBlock = {
   createdAt: string;
 };
 
+export type ApiOrganization = {
+  id: string;
+  displayName: string;
+  organizationName: string;
+  location: string;
+};
+
+export type ApiScannedProduct = {
+  gtin: string;
+  upc: string;
+  name: string;
+  brand: string;
+  category: string;
+};
+
+export type ApiDonationRecord = {
+  id: string;
+  status: 'posted' | 'accepted' | 'declined' | 'received' | 'cancelled';
+  createdAt: string;
+};
+
+export type ApiDonationStatus = 'posted' | 'accepted' | 'declined' | 'received' | 'cancelled';
+
+export type ApiDonation = {
+  id: string;
+  status: ApiDonationStatus;
+  donorOrgId: string;
+  recipientOrgId: string;
+  productName: string;
+  productBrand: string;
+  productCategory: string;
+  upc: string;
+  gtin: string;
+  quantity: number;
+  unit: string;
+  conditionNotes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ApiDonationTimelineEvent = {
+  id: string;
+  eventType: string;
+  actorUserId: string;
+  actorRole: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+};
+
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   token?: string;
@@ -95,6 +144,10 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     try {
       payload = JSON.parse(rawBody);
     } catch {
+      const looksLikeHtml = /<!doctype html>|<html/i.test(rawBody);
+      if (looksLikeHtml) {
+        throw new Error('Backend route is unavailable or outdated. Please redeploy the API service and try again.');
+      }
       if (!response.ok) {
         throw new Error('Server returned a non-JSON error response. Please update/redeploy the API server and try again.');
       }
@@ -235,4 +288,130 @@ export async function sendEngagementMessage(
     token,
     body: input,
   });
+}
+
+export async function lookupProductByBarcode(token: string, input: { barcode: string; format?: string }) {
+  return apiRequest<{ success: true; product: ApiScannedProduct; source: string }>('/api/products/lookup', {
+    method: 'POST',
+    token,
+    body: input,
+  });
+}
+
+export async function getOrganizations(token: string) {
+  return apiRequest<{ success: true; organizations: ApiOrganization[] }>('/api/organizations', {
+    token,
+  });
+}
+
+export async function createDonationRecord(
+  token: string,
+  input: {
+    donorLocationId: string;
+    recipientOrgId: string;
+    item: ApiScannedProduct;
+    quantity: number;
+    unit: string;
+    expiresAt?: string;
+    pickupWindowStart?: string;
+    pickupWindowEnd?: string;
+    conditionNotes?: string;
+    estimatedUnitValue?: number;
+    currency?: string;
+  }
+) {
+  return apiRequest<{ success: true; donation: ApiDonationRecord }>('/api/donations', {
+    method: 'POST',
+    token,
+    body: input,
+  });
+}
+
+export async function getDonations(token: string, status?: ApiDonationStatus) {
+  const params = status ? `?status=${encodeURIComponent(status)}` : '';
+  return apiRequest<{ success: true; donations: ApiDonation[] }>(`/api/donations${params}`, { token });
+}
+
+export async function getDonationById(token: string, donationId: string) {
+  return apiRequest<{ success: true; donation: ApiDonation; timeline: ApiDonationTimelineEvent[] }>(
+    `/api/donations/${encodeURIComponent(donationId)}`,
+    { token }
+  );
+}
+
+export async function acceptDonation(token: string, donationId: string, note?: string) {
+  return apiRequest<{ success: true; status: 'accepted' }>(`/api/donations/${encodeURIComponent(donationId)}/accept`, {
+    method: 'POST',
+    token,
+    body: { note: note || '' },
+  });
+}
+
+export async function declineDonation(token: string, donationId: string, reason?: string) {
+  return apiRequest<{ success: true; status: 'declined' }>(`/api/donations/${encodeURIComponent(donationId)}/decline`, {
+    method: 'POST',
+    token,
+    body: { reason: reason || '' },
+  });
+}
+
+export async function generateDonationHandoffToken(token: string, donationId: string) {
+  return apiRequest<{ success: true; handoffToken: string; expiresAt: string }>(
+    `/api/donations/${encodeURIComponent(donationId)}/handoff-token`,
+    {
+      method: 'POST',
+      token,
+    }
+  );
+}
+
+export async function confirmDonationHandoff(
+  token: string,
+  donationId: string,
+  input: { handoffToken: string; receivedQuantity?: number; receivedUnit?: string; receiptNote?: string }
+) {
+  return apiRequest<{ success: true; status: 'received' }>(`/api/donations/${encodeURIComponent(donationId)}/confirm-handoff`, {
+    method: 'POST',
+    token,
+    body: input,
+  });
+}
+
+export async function getDonationImpactSummary(token: string) {
+  return apiRequest<{
+    success: true;
+    summary: {
+      itemsDonated: number;
+      estimatedInventoryValue: number;
+      recipientCount: number;
+      completedPickups: number;
+    };
+  }>('/api/donations/impact-summary', { token });
+}
+
+export async function exportDonationRecords(token: string) {
+  return apiRequest<{ success: true; records: ApiDonation[] }>(`/api/donations/export?format=json`, {
+    token,
+  });
+}
+
+export async function exportDonationRecordsCsv(token: string) {
+  const response = await fetch(`${API_BASE_URL}/api/donations/export?format=csv`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  const rawBody = await response.text();
+  if (!response.ok) {
+    try {
+      const payload = JSON.parse(rawBody);
+      throw new Error(payload.error || payload.message || 'CSV export failed');
+    } catch {
+      throw new Error(rawBody || 'CSV export failed');
+    }
+  }
+
+  return rawBody;
 }

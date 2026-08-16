@@ -111,3 +111,68 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_blocks_blockerUserId ON blocks(blockerUserId);
 CREATE INDEX IF NOT EXISTS idx_blocks_blockedUserId ON blocks(blockedUserId);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_userId ON password_reset_tokens(userId);
+
+-- Create donation records table
+CREATE TABLE IF NOT EXISTS donation_records (
+  id TEXT PRIMARY KEY,
+  donorOrgId TEXT NOT NULL,
+  donorLocationId TEXT NOT NULL,
+  recipientOrgId TEXT NOT NULL,
+  status TEXT NOT NULL CHECK(status IN ('posted','accepted','declined','received','cancelled')),
+  gtin TEXT DEFAULT '',
+  upc TEXT DEFAULT '',
+  productName TEXT NOT NULL,
+  productBrand TEXT DEFAULT '',
+  productCategory TEXT DEFAULT 'food',
+  quantity NUMERIC NOT NULL,
+  unit TEXT NOT NULL DEFAULT 'units',
+  estimatedUnitValue NUMERIC,
+  estimatedTotalValue NUMERIC,
+  currency TEXT DEFAULT 'USD',
+  conditionNotes TEXT DEFAULT '',
+  expiresAt TEXT DEFAULT '',
+  pickupWindowStart TEXT DEFAULT '',
+  pickupWindowEnd TEXT DEFAULT '',
+  acceptedAt TEXT DEFAULT '',
+  declinedAt TEXT DEFAULT '',
+  receivedAt TEXT DEFAULT '',
+  createdByUserId TEXT NOT NULL,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL
+);
+
+-- Create donation events table (append-only audit timeline)
+CREATE TABLE IF NOT EXISTS donation_events (
+  id TEXT PRIMARY KEY,
+  donationId TEXT NOT NULL,
+  eventType TEXT NOT NULL CHECK(eventType IN (
+    'posted','accepted','declined','handoff_token_generated','handoff_confirmed','cancelled','updated'
+  )),
+  actorUserId TEXT NOT NULL,
+  actorRole TEXT NOT NULL CHECK(actorRole IN ('business','organization','admin','system')),
+  payloadJson TEXT NOT NULL DEFAULT '{}',
+  createdAt TEXT NOT NULL
+);
+
+-- Create donation handoff table for one-time handoff token confirmation
+CREATE TABLE IF NOT EXISTS donation_handoffs (
+  id TEXT PRIMARY KEY,
+  donationId TEXT NOT NULL,
+  handoffTokenHash TEXT NOT NULL,
+  tokenExpiresAt TEXT NOT NULL,
+  usedAt TEXT DEFAULT '',
+  generatedByUserId TEXT NOT NULL,
+  receivedByUserId TEXT DEFAULT '',
+  receivedQuantity NUMERIC,
+  receivedUnit TEXT DEFAULT '',
+  receiptNote TEXT DEFAULT '',
+  createdAt TEXT NOT NULL
+);
+
+-- Donation indexes
+CREATE INDEX IF NOT EXISTS idx_donation_records_status ON donation_records(status);
+CREATE INDEX IF NOT EXISTS idx_donation_records_donorLocationId ON donation_records(donorLocationId);
+CREATE INDEX IF NOT EXISTS idx_donation_records_recipientOrgId ON donation_records(recipientOrgId);
+CREATE INDEX IF NOT EXISTS idx_donation_records_createdAt ON donation_records(createdAt);
+CREATE INDEX IF NOT EXISTS idx_donation_events_donationId ON donation_events(donationId);
+CREATE INDEX IF NOT EXISTS idx_donation_handoffs_donationId ON donation_handoffs(donationId);

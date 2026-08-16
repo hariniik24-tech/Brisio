@@ -8,10 +8,10 @@
     "scheme": "brisio",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "supportsTablet": true,
       "bundleIdentifier": "com.brisio.app",
-      "buildNumber": "23",
+      "buildNumber": "31",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -33,6 +33,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Brisio to scan barcodes for donation inventory."
+        }
+      ],
       [
         "expo-splash-screen",
         {

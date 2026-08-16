@@ -28,9 +28,10 @@ const supabase = createClient(supabaseUrl, supabaseServerKey);
 
 const smtpHost = String(process.env.SMTP_HOST || '').trim();
 const smtpPort = Number(process.env.SMTP_PORT || '587');
-const smtpSecure = String(process.env.SMTP_SECURE || '').trim().toLowerCase() === 'true';
+const smtpSecureRaw = String(process.env.SMTP_SECURE || '').trim().toLowerCase();
+const smtpSecure = smtpSecureRaw ? smtpSecureRaw === 'true' : smtpPort === 465;
 const smtpUser = String(process.env.SMTP_USER || '').trim();
-const smtpPass = String(process.env.SMTP_PASS || '').trim();
+const smtpPass = String(process.env.SMTP_PASS || '').replace(/\s+/g, '').trim();
 const resetEmailFrom = String(process.env.RESET_EMAIL_FROM || smtpUser || '').trim();
 const includeResetCodeInResponse = String(process.env.INCLUDE_RESET_CODE_IN_RESPONSE || '').trim().toLowerCase() === 'true';
 
@@ -225,6 +226,55 @@ function getFirstDefined(obj, keys, fallback = '') {
     if (obj && obj[key] !== undefined && obj[key] !== null) return obj[key];
   }
   return fallback;
+}
+
+function parseJsonSafe(value, fallback = {}) {
+  try {
+    if (!value) return fallback;
+    if (typeof value === 'object') return value;
+    return JSON.parse(String(value));
+  } catch {
+    return fallback;
+  }
+}
+
+function normalizeBarcode(value) {
+  return String(value || '').replace(/\D/g, '').trim();
+}
+
+function normalizeGtinFromBarcode(barcode) {
+  const normalized = normalizeBarcode(barcode);
+  if (!normalized) return '';
+  return normalized.padStart(14, '0');
+}
+
+async function appendDonationEvent({ donationId, eventType, actorUserId, actorRole, payload = {} }) {
+  const createdAt = new Date().toISOString();
+  await supabase.from('donation_events').insert([{
+    id: crypto.randomUUID(),
+    donationId,
+    donationid: donationId,
+    eventType,
+    eventtype: eventType,
+    actorUserId,
+    actoruserid: actorUserId,
+    actorRole,
+    actorrole: actorRole,
+    payloadJson: JSON.stringify(payload || {}),
+    payloadjson: JSON.stringify(payload || {}),
+    createdAt,
+    createdat: createdAt,
+  }]);
+}
+
+async function getDonationById(donationId) {
+  const { data, error } = await supabase
+    .from('donation_records')
+    .select('*')
+    .eq('id', donationId)
+    .single();
+  if (error || !data) return null;
+  return data;
 }
 
 function normalizeUserRow(row) {
@@ -522,6 +572,30 @@ const CATEGORY_KEYWORDS = {
 
 const URGENCY_WORDS = ['now', 'free', 'available today', 'urgent', 'immediately', 'asap', 'today', 'tonight', 'this week', 'limited time'];
 const STOP_WORDS = new Set(['a','an','the','and','or','but','in','on','at','to','for','of','with','by','is','are','was','were','be','have','has','do','does','i','we','you','they','it','this','that','these','those','my','our','your','their','its','can','will','need','want','looking']);
+
+const SAMPLE_PRODUCT_CATALOG = {
+  '012345678905': {
+    gtin: '00012345678905',
+    upc: '012345678905',
+    name: 'Honey Oat Cereal',
+    brand: 'Example Foods',
+    category: 'food',
+  },
+  '041196910103': {
+    gtin: '00041196910103',
+    upc: '041196910103',
+    name: 'Peanut Butter Crackers',
+    brand: 'Snack Co',
+    category: 'food',
+  },
+  '036000291452': {
+    gtin: '00036000291452',
+    upc: '036000291452',
+    name: 'Canned Soup',
+    brand: 'Kitchen Pantry',
+    category: 'food',
+  },
+};
 
 function tokenize(text) {
   return text.toLowerCase()
@@ -2251,6 +2325,515 @@ app.post('/api/chat/action', async (req, res) => {
         suggestions: [{ id: 'show_urgent', text: 'Show urgent listings' }],
       },
     });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Resource Scan and Donation Endpoints
+app.post('/api/products/lookup', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+
+    const barcode = normalizeBarcode(req.body?.barcode || '');
+    if (!barcode) {
+      return res.status(400).json({ success: false, error: 'barcode is required' });
+    }
+
+    const fromCatalog = SAMPLE_PRODUCT_CATALOG[barcode];
+    const product = fromCatalog || {
+      gtin: normalizeGtinFromBarcode(barcode),
+      upc: barcode,
+      name: `Scanned item ${barcode}`,
+      brand: 'Unknown brand',
+      category: 'food',
+    };
+
+    res.json({ success: true, product, source: fromCatalog ? 'sample-catalog' : 'fallback' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/donations', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+
+    if (req.user.role !== 'business') {
+      return res.status(403).json({ success: false, error: 'Only business users can create donation records.' });
+    }
+
+    const donation = req.body || {};
+    const recipientOrgId = String(donation.recipientOrgId || '').trim();
+    const donorLocationId = String(donation.donorLocationId || '').trim();
+    const quantity = Number(donation.quantity || 0);
+    const item = donation.item || {};
+    const productName = String(item.name || '').trim();
+
+    if (!recipientOrgId || !donorLocationId || !productName || !Number.isFinite(quantity) || quantity <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'recipientOrgId, donorLocationId, item.name, and a positive quantity are required',
+      });
+    }
+
+    const { data: recipient, error: recipientError } = await supabase
+      .from('users')
+      .select('id, role')
+      .eq('id', recipientOrgId)
+      .single();
+
+    if (recipientError || !recipient || String(recipient.role) !== 'organization') {
+      return res.status(400).json({ success: false, error: 'recipientOrgId must reference an organization account' });
+    }
+
+    const id = `don_${crypto.randomUUID()}`;
+    const now = new Date().toISOString();
+    const unit = String(donation.unit || 'units').trim() || 'units';
+    const estimatedUnitValue = donation.estimatedUnitValue === undefined || donation.estimatedUnitValue === null
+      ? null
+      : Number(donation.estimatedUnitValue);
+    const estimatedTotalValue = Number.isFinite(estimatedUnitValue) ? Number((estimatedUnitValue * quantity).toFixed(2)) : null;
+
+    const row = {
+      id,
+      donorOrgId: req.user.id,
+      donororgid: req.user.id,
+      donorLocationId: donorLocationId,
+      donorlocationid: donorLocationId,
+      recipientOrgId: recipientOrgId,
+      recipientorgid: recipientOrgId,
+      status: 'posted',
+      gtin: String(item.gtin || normalizeGtinFromBarcode(item.upc || '')),
+      upc: String(item.upc || ''),
+      productName,
+      productname: productName,
+      productBrand: String(item.brand || ''),
+      productbrand: String(item.brand || ''),
+      productCategory: String(item.category || 'food'),
+      productcategory: String(item.category || 'food'),
+      quantity,
+      unit,
+      estimatedUnitValue: Number.isFinite(estimatedUnitValue) ? estimatedUnitValue : null,
+      estimatedunitvalue: Number.isFinite(estimatedUnitValue) ? estimatedUnitValue : null,
+      estimatedTotalValue,
+      estimatedtotalvalue: estimatedTotalValue,
+      currency: String(donation.currency || 'USD'),
+      conditionNotes: String(donation.conditionNotes || ''),
+      conditionnotes: String(donation.conditionNotes || ''),
+      expiresAt: String(donation.expiresAt || ''),
+      expiresat: String(donation.expiresAt || ''),
+      pickupWindowStart: String(donation.pickupWindowStart || ''),
+      pickupwindowstart: String(donation.pickupWindowStart || ''),
+      pickupWindowEnd: String(donation.pickupWindowEnd || ''),
+      pickupwindowend: String(donation.pickupWindowEnd || ''),
+      createdByUserId: req.user.id,
+      createdbyuserid: req.user.id,
+      createdAt: now,
+      createdat: now,
+      updatedAt: now,
+      updatedat: now,
+    };
+
+    const { error } = await supabase.from('donation_records').insert([row]);
+    if (error) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(error) });
+    }
+
+    await appendDonationEvent({
+      donationId: id,
+      eventType: 'posted',
+      actorUserId: req.user.id,
+      actorRole: req.user.role,
+      payload: { quantity, unit, recipientOrgId },
+    });
+
+    res.json({ success: true, donation: { id, status: 'posted', createdAt: now } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/donations', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+
+    let query = supabase.from('donation_records').select('*').order('createdAt', { ascending: false }).limit(200);
+    if (req.query.status) {
+      query = query.eq('status', String(req.query.status));
+    }
+    if (req.user.role === 'business') {
+      query = query.eq('donorOrgId', req.user.id);
+    }
+    if (req.user.role === 'organization') {
+      query = query.eq('recipientOrgId', req.user.id);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(error) });
+    }
+
+    res.json({ success: true, donations: data || [] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/donations/impact-summary', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+
+    let query = supabase.from('donation_records').select('status, quantity, estimatedTotalValue, recipientOrgId');
+    if (req.user.role === 'business') {
+      query = query.eq('donorOrgId', req.user.id);
+    }
+    if (req.user.role === 'organization') {
+      query = query.eq('recipientOrgId', req.user.id);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(error) });
+    }
+
+    const rows = data || [];
+    const recipientSet = new Set(rows.map((r) => String(r.recipientOrgId || r.recipientorgid || '')).filter(Boolean));
+    const summary = {
+      itemsDonated: rows.reduce((acc, row) => acc + Number(row.quantity || 0), 0),
+      estimatedInventoryValue: Number(rows.reduce((acc, row) => acc + Number(row.estimatedTotalValue || row.estimatedtotalvalue || 0), 0).toFixed(2)),
+      recipientCount: recipientSet.size,
+      completedPickups: rows.filter((r) => String(r.status) === 'received').length,
+    };
+
+    res.json({ success: true, summary });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/donations/export', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+
+    let query = supabase.from('donation_records').select('*').order('createdAt', { ascending: false }).limit(500);
+    if (req.user.role === 'business') {
+      query = query.eq('donorOrgId', req.user.id);
+    }
+    if (req.user.role === 'organization') {
+      query = query.eq('recipientOrgId', req.user.id);
+    }
+    const { data, error } = await query;
+    if (error) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(error) });
+    }
+
+    const format = String(req.query.format || 'json').toLowerCase();
+    if (format === 'csv') {
+      const rows = data || [];
+      const header = ['id', 'status', 'productName', 'quantity', 'unit', 'estimatedTotalValue', 'createdAt', 'recipientOrgId'];
+      const lines = [header.join(',')];
+      for (const row of rows) {
+        const values = [
+          getFirstDefined(row, ['id']),
+          getFirstDefined(row, ['status']),
+          getFirstDefined(row, ['productName', 'productname']),
+          getFirstDefined(row, ['quantity']),
+          getFirstDefined(row, ['unit']),
+          getFirstDefined(row, ['estimatedTotalValue', 'estimatedtotalvalue']),
+          getFirstDefined(row, ['createdAt', 'createdat']),
+          getFirstDefined(row, ['recipientOrgId', 'recipientorgid']),
+        ].map((v) => `"${String(v || '').replace(/"/g, '""')}"`);
+        lines.push(values.join(','));
+      }
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="donation-records.csv"');
+      return res.send(lines.join('\n'));
+    }
+
+    res.json({ success: true, records: data || [] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/donations/:id', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+
+    const donation = await getDonationById(req.params.id);
+    if (!donation) {
+      return res.status(404).json({ success: false, error: 'Donation not found' });
+    }
+
+    const donorOrgId = String(getFirstDefined(donation, ['donorOrgId', 'donororgid']));
+    const recipientOrgId = String(getFirstDefined(donation, ['recipientOrgId', 'recipientorgid']));
+    if (req.user.role !== 'admin' && donorOrgId !== req.user.id && recipientOrgId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+
+    const { data: events } = await supabase
+      .from('donation_events')
+      .select('*')
+      .eq('donationId', req.params.id)
+      .order('createdAt', { ascending: true });
+
+    const timeline = (events || []).map((event) => ({
+      id: getFirstDefined(event, ['id']),
+      eventType: getFirstDefined(event, ['eventType', 'eventtype']),
+      actorUserId: getFirstDefined(event, ['actorUserId', 'actoruserid']),
+      actorRole: getFirstDefined(event, ['actorRole', 'actorrole']),
+      payload: parseJsonSafe(getFirstDefined(event, ['payloadJson', 'payloadjson']), {}),
+      createdAt: getFirstDefined(event, ['createdAt', 'createdat']),
+    }));
+
+    res.json({ success: true, donation, timeline });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/donations/:id/accept', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+    if (req.user.role !== 'organization') {
+      return res.status(403).json({ success: false, error: 'Only organization users can accept donations.' });
+    }
+
+    const donation = await getDonationById(req.params.id);
+    if (!donation) {
+      return res.status(404).json({ success: false, error: 'Donation not found' });
+    }
+    const recipientOrgId = String(getFirstDefined(donation, ['recipientOrgId', 'recipientorgid']));
+    if (recipientOrgId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'This donation is assigned to a different organization.' });
+    }
+    if (String(donation.status) !== 'posted') {
+      return res.status(400).json({ success: false, error: 'Only posted donations can be accepted.' });
+    }
+
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from('donation_records')
+      .update({ status: 'accepted', acceptedAt: now, acceptedat: now, updatedAt: now, updatedat: now })
+      .eq('id', req.params.id);
+    if (error) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(error) });
+    }
+
+    await appendDonationEvent({
+      donationId: req.params.id,
+      eventType: 'accepted',
+      actorUserId: req.user.id,
+      actorRole: req.user.role,
+      payload: { note: String(req.body?.note || '').trim() },
+    });
+
+    res.json({ success: true, status: 'accepted' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/donations/:id/decline', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+    if (req.user.role !== 'organization') {
+      return res.status(403).json({ success: false, error: 'Only organization users can decline donations.' });
+    }
+
+    const donation = await getDonationById(req.params.id);
+    if (!donation) {
+      return res.status(404).json({ success: false, error: 'Donation not found' });
+    }
+    const recipientOrgId = String(getFirstDefined(donation, ['recipientOrgId', 'recipientorgid']));
+    if (recipientOrgId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'This donation is assigned to a different organization.' });
+    }
+    if (String(donation.status) !== 'posted') {
+      return res.status(400).json({ success: false, error: 'Only posted donations can be declined.' });
+    }
+
+    const now = new Date().toISOString();
+    const reason = String(req.body?.reason || '').trim();
+    const { error } = await supabase
+      .from('donation_records')
+      .update({ status: 'declined', declinedAt: now, declinedat: now, updatedAt: now, updatedat: now })
+      .eq('id', req.params.id);
+    if (error) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(error) });
+    }
+
+    await appendDonationEvent({
+      donationId: req.params.id,
+      eventType: 'declined',
+      actorUserId: req.user.id,
+      actorRole: req.user.role,
+      payload: { reason },
+    });
+
+    res.json({ success: true, status: 'declined' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/donations/:id/handoff-token', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+
+    const donation = await getDonationById(req.params.id);
+    if (!donation) {
+      return res.status(404).json({ success: false, error: 'Donation not found' });
+    }
+
+    const donorOrgId = String(getFirstDefined(donation, ['donorOrgId', 'donororgid']));
+    if (donorOrgId !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Only the donor can generate handoff tokens.' });
+    }
+    if (String(donation.status) !== 'accepted') {
+      return res.status(400).json({ success: false, error: 'Donation must be accepted before generating a handoff token.' });
+    }
+
+    const token = crypto.randomBytes(24).toString('hex');
+    const tokenHash = hashResetCode(token);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 1000 * 60 * 60).toISOString();
+
+    const { error } = await supabase.from('donation_handoffs').insert([{
+      id: crypto.randomUUID(),
+      donationId: req.params.id,
+      donationid: req.params.id,
+      handoffTokenHash: tokenHash,
+      handofftokenhash: tokenHash,
+      tokenExpiresAt: expiresAt,
+      tokenexpiresat: expiresAt,
+      usedAt: '',
+      usedat: '',
+      generatedByUserId: req.user.id,
+      generatedbyuserid: req.user.id,
+      createdAt: now.toISOString(),
+      createdat: now.toISOString(),
+    }]);
+    if (error) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(error) });
+    }
+
+    await appendDonationEvent({
+      donationId: req.params.id,
+      eventType: 'handoff_token_generated',
+      actorUserId: req.user.id,
+      actorRole: req.user.role,
+      payload: { tokenExpiresAt: expiresAt },
+    });
+
+    res.json({ success: true, handoffToken: token, expiresAt });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/donations/:id/confirm-handoff', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+    if (req.user.role !== 'organization') {
+      return res.status(403).json({ success: false, error: 'Only organization users can confirm handoff.' });
+    }
+
+    const donation = await getDonationById(req.params.id);
+    if (!donation) {
+      return res.status(404).json({ success: false, error: 'Donation not found' });
+    }
+
+    const recipientOrgId = String(getFirstDefined(donation, ['recipientOrgId', 'recipientorgid']));
+    if (recipientOrgId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'This donation is assigned to a different organization.' });
+    }
+    if (String(donation.status) !== 'accepted') {
+      return res.status(400).json({ success: false, error: 'Only accepted donations can be confirmed.' });
+    }
+
+    const handoffToken = String(req.body?.handoffToken || '').trim();
+    if (!handoffToken) {
+      return res.status(400).json({ success: false, error: 'handoffToken is required' });
+    }
+
+    const tokenHash = hashResetCode(handoffToken);
+    const { data: handoff, error: handoffError } = await supabase
+      .from('donation_handoffs')
+      .select('*')
+      .eq('donationId', req.params.id)
+      .eq('handoffTokenHash', tokenHash)
+      .order('createdAt', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (handoffError || !handoff) {
+      return res.status(400).json({ success: false, error: 'Invalid handoff token' });
+    }
+
+    const usedAt = getFirstDefined(handoff, ['usedAt', 'usedat']);
+    const tokenExpiresAt = getFirstDefined(handoff, ['tokenExpiresAt', 'tokenexpiresat']);
+    if (usedAt) {
+      return res.status(400).json({ success: false, error: 'Handoff token has already been used' });
+    }
+    if (new Date(tokenExpiresAt).getTime() < Date.now()) {
+      return res.status(400).json({ success: false, error: 'Handoff token expired' });
+    }
+
+    const receivedQuantity = Number(req.body?.receivedQuantity || donation.quantity || 0);
+    const receivedUnit = String(req.body?.receivedUnit || donation.unit || 'units').trim() || 'units';
+    const receiptNote = String(req.body?.receiptNote || '').trim();
+    const now = new Date().toISOString();
+
+    const { error: handoffUpdateError } = await supabase
+      .from('donation_handoffs')
+      .update({
+        usedAt: now,
+        usedat: now,
+        receivedByUserId: req.user.id,
+        receivedbyuserid: req.user.id,
+        receivedQuantity,
+        receivedquantity: receivedQuantity,
+        receivedUnit,
+        receivedunit: receivedUnit,
+        receiptNote,
+        receiptnote: receiptNote,
+      })
+      .eq('id', getFirstDefined(handoff, ['id']));
+
+    if (handoffUpdateError) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(handoffUpdateError) });
+    }
+
+    const { error: donationUpdateError } = await supabase
+      .from('donation_records')
+      .update({ status: 'received', receivedAt: now, receivedat: now, updatedAt: now, updatedat: now })
+      .eq('id', req.params.id);
+
+    if (donationUpdateError) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(donationUpdateError) });
+    }
+
+    await appendDonationEvent({
+      donationId: req.params.id,
+      eventType: 'handoff_confirmed',
+      actorUserId: req.user.id,
+      actorRole: req.user.role,
+      payload: { receivedQuantity, receivedUnit, receiptNote },
+    });
+
+    res.json({ success: true, status: 'received' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

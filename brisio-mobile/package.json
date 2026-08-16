@@ -6,6 +6,7 @@
     "@expo/ui": "~57.0.6",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.6",
+    "expo-camera": "~57.0.3",
     "expo-constants": "~57.0.5",
     "expo-device": "~57.0.1",
     "expo-font": "~57.0.1",
@@ -22,6 +23,7 @@
     "react-dom": "19.2.3",
     "react-native": "0.86.0",
     "react-native-gesture-handler": "~2.32.0",
+    "react-native-qrcode-svg": "^6.3.21",
     "react-native-reanimated": "4.5.0",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.25.2",
@@ -30,7 +32,6 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "eas-cli": "^21.5.0",
     "eslint": "^9.39.5",
     "eslint-config-expo": "~57.0.0",
     "typescript": "~6.0.3"

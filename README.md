@@ -113,6 +113,9 @@ curl http://localhost:3000/api/recommend/i%20need%20food%20support%20today
 2. New Web Service on https://render.com
 3. Build command: `npm install`
 4. Start command: `node server.js`
+5. Set email delivery secrets for password resets:
+  - `RESEND_API_KEY` and `RESEND_FROM` for transactional email, or
+  - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, and `RESET_EMAIL_FROM` for SMTP fallback
 
 ### Option C: VPS (DigitalOcean, Linode)
 ```bash

@@ -42,6 +42,8 @@ const smtpUser = normalizeEnvString(process.env.SMTP_USER);
 const smtpPass = normalizeEnvSecret(process.env.SMTP_PASS);
 const resetEmailFrom = normalizeEnvString(process.env.RESET_EMAIL_FROM || smtpUser || '');
 const includeResetCodeInResponse = normalizeEnvString(process.env.INCLUDE_RESET_CODE_IN_RESPONSE).toLowerCase() === 'true';
+const resendApiKey = normalizeEnvString(process.env.RESEND_API_KEY);
+const resendFrom = normalizeEnvString(process.env.RESEND_FROM || resetEmailFrom);
 
 let resetMailer = null;
 
@@ -155,11 +157,55 @@ function getResetMailer() {
   return resetMailer;
 }
 
+async function sendResetCodeViaResend({ to, resetCode, expiresAt }) {
+  if (!resendApiKey || !resendFrom) {
+    return { sent: false, reason: 'resend-not-configured' };
+  }
+
+  const expiresText = new Date(expiresAt).toLocaleString('en-US', { timeZone: 'UTC', timeZoneName: 'short' });
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${resendApiKey}`,
+    },
+    body: JSON.stringify({
+      from: resendFrom,
+      to: [to],
+      subject: 'Your Brisio password reset code',
+      text: `Your Brisio reset code is ${resetCode}. This code expires at ${expiresText}. If you did not request this, you can ignore this email.`,
+    }),
+  });
+
+  const responseText = await response.text();
+  if (!response.ok) {
+    throw new Error(`Resend request failed (${response.status}): ${responseText}`);
+  }
+
+  return { sent: true, provider: 'resend', response: responseText };
+}
+
 async function sendResetCodeEmail({ to, resetCode, expiresAt }) {
+  if (resendApiKey && resendFrom) {
+    try {
+      const result = await sendResetCodeViaResend({ to, resetCode, expiresAt });
+      appendInstrumentation({
+        type: 'forgot-password-email-sent',
+        provider: 'resend',
+        email: to,
+        response: String(result?.response || ''),
+      });
+      return result;
+    } catch (error) {
+      console.error('Reset email send error via Resend:', error);
+      appendInstrumentation({ type: 'forgot-password-email-failed', provider: 'resend', email: to, error: String(error?.message || error) });
+    }
+  }
+
   const mailer = getResetMailer();
   if (!mailer) {
-    appendInstrumentation({ type: 'forgot-password-email-skipped', reason: 'smtp-not-configured', email: to });
-    return { sent: false, reason: 'smtp-not-configured' };
+    appendInstrumentation({ type: 'forgot-password-email-skipped', reason: 'no-mail-provider-configured', email: to });
+    return { sent: false, reason: 'no-mail-provider-configured' };
   }
 
   const expiresText = new Date(expiresAt).toLocaleString('en-US', { timeZone: 'UTC', timeZoneName: 'short' });
@@ -172,14 +218,15 @@ async function sendResetCodeEmail({ to, resetCode, expiresAt }) {
     });
     appendInstrumentation({
       type: 'forgot-password-email-sent',
+      provider: 'smtp',
       email: to,
       messageId: String(info?.messageId || ''),
       response: String(info?.response || ''),
     });
-    return { sent: true, messageId: String(info?.messageId || ''), response: String(info?.response || '') };
+    return { sent: true, provider: 'smtp', messageId: String(info?.messageId || ''), response: String(info?.response || '') };
   } catch (error) {
     console.error('Reset email send error:', error);
-    appendInstrumentation({ type: 'forgot-password-email-failed', email: to, error: String(error?.message || error) });
+    appendInstrumentation({ type: 'forgot-password-email-failed', provider: 'smtp', email: to, error: String(error?.message || error) });
     return { sent: false, reason: String(error?.message || error) };
   }
 }

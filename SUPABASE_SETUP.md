@@ -27,9 +27,14 @@ Edit `/Users/hariniikarthikeyan/Downloads/Brisio/.env.local`:
 SUPABASE_URL=https://your-project-id.supabase.co
 SUPABASE_ANON_KEY=your_anon_key_here
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
+RESEND_API_KEY=your_resend_api_key_here
+RESEND_FROM=Brisio <reset@yourdomain.com>
 PORT=3000
 NODE_ENV=development
 ```
+
+If you do not use Resend, configure SMTP instead:
+`SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, and `RESET_EMAIL_FROM`.
 
 ### Step 4: Create Database Schema
 1. In your Supabase project, go to **SQL Editor**

@@ -13,6 +13,16 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', process.env.CORS_ORIGIN || '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 // Initialize Supabase client
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
@@ -141,6 +151,9 @@ function getResetMailer() {
     host: smtpHost,
     port: smtpPort,
     secure: smtpSecure,
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000,
     auth: {
       user: smtpUser,
       pass: smtpPass,
@@ -169,6 +182,7 @@ async function sendResetCodeViaResend({ to, resetCode, expiresAt }) {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${resendApiKey}`,
     },
+    signal: AbortSignal.timeout(15000),
     body: JSON.stringify({
       from: resendFrom,
       to: [to],

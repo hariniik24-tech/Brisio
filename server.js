@@ -54,6 +54,8 @@ const resetEmailFrom = normalizeEnvString(process.env.RESET_EMAIL_FROM || smtpUs
 const includeResetCodeInResponse = normalizeEnvString(process.env.INCLUDE_RESET_CODE_IN_RESPONSE).toLowerCase() === 'true';
 const resendApiKey = normalizeEnvString(process.env.RESEND_API_KEY);
 const resendFrom = normalizeEnvString(process.env.RESEND_FROM || resetEmailFrom);
+const googleMailerUrl = normalizeEnvString(process.env.GOOGLE_MAILER_URL);
+const googleMailerSecret = normalizeEnvSecret(process.env.GOOGLE_MAILER_SECRET);
 
 let resetMailer = null;
 
@@ -200,7 +202,49 @@ async function sendResetCodeViaResend({ to, resetCode, expiresAt }) {
   return { sent: true, provider: 'resend', response: responseText };
 }
 
+async function sendResetCodeViaGoogle({ to, resetCode, expiresAt }) {
+  if (!googleMailerUrl || !googleMailerSecret) {
+    return { sent: false, reason: 'google-mailer-not-configured' };
+  }
+
+  const response = await fetch(googleMailerUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(15000),
+    body: JSON.stringify({
+      secret: googleMailerSecret,
+      to,
+      resetCode,
+      expiresAt: new Date(expiresAt).toLocaleString('en-US', { timeZone: 'UTC', timeZoneName: 'short' }),
+    }),
+  });
+  const responseText = await response.text();
+  let payload = null;
+  try {
+    payload = JSON.parse(responseText);
+  } catch {
+    // The response validation below reports a bounded provider error.
+  }
+
+  if (!response.ok || !payload?.success) {
+    throw new Error(`Google mailer request failed (${response.status})`);
+  }
+
+  return { sent: true, provider: 'google', response: responseText };
+}
+
 async function sendResetCodeEmail({ to, resetCode, expiresAt }) {
+  if (googleMailerUrl && googleMailerSecret) {
+    try {
+      const result = await sendResetCodeViaGoogle({ to, resetCode, expiresAt });
+      appendInstrumentation({ type: 'forgot-password-email-sent', provider: 'google', email: to });
+      return result;
+    } catch (error) {
+      console.error('Reset email send error via Google:', error);
+      appendInstrumentation({ type: 'forgot-password-email-failed', provider: 'google', email: to, error: String(error?.message || error) });
+    }
+  }
+
   if (resendApiKey && resendFrom) {
     try {
       const result = await sendResetCodeViaResend({ to, resetCode, expiresAt });

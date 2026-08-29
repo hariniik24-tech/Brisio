@@ -247,29 +247,54 @@ async function sendResetCodeEmail({ to, resetCode, expiresAt }) {
 }
 
 async function getActiveResetTokenForUser(userId) {
-  const { data: tokens, error: tokenError } = await supabase
-    .from('password_reset_tokens')
-    .select('*')
-    .eq('userId', userId)
-    .eq('usedAt', null)
-    .order('createdAt', { ascending: false })
-    .limit(1);
+  const attempts = [
+    { userKey: 'userId', usedKey: 'usedAt' },
+    { userKey: 'userid', usedKey: 'usedat' },
+  ];
 
-  if (tokenError) {
-    return { error: tokenError };
+  let lastError = null;
+
+  for (const attempt of attempts) {
+    const { data: tokens, error: tokenError } = await supabase
+      .from('password_reset_tokens')
+      .select('*')
+      .eq(attempt.userKey, userId)
+      .limit(20);
+
+    if (tokenError) {
+      lastError = tokenError;
+      continue;
+    }
+
+    const tokenRow = (tokens || [])
+      .filter((token) => {
+        const usedAt = token?.[attempt.usedKey];
+        return usedAt === null || usedAt === undefined || usedAt === '';
+      })
+      .slice()
+      .sort((a, b) => {
+        const aCreated = new Date(a?.createdAt || a?.createdat || 0).getTime();
+        const bCreated = new Date(b?.createdAt || b?.createdat || 0).getTime();
+        return bCreated - aCreated;
+      })[0];
+
+    if (!tokenRow) {
+      continue;
+    }
+
+    const expiresAt = new Date(getFirstDefined(tokenRow, ['expiresAt', 'expiresat'])).getTime();
+    if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) {
+      return { validationError: 'Reset code expired' };
+    }
+
+    return { tokenRow };
   }
 
-  const tokenRow = tokens && tokens[0];
-  if (!tokenRow) {
-    return { validationError: 'No active reset code found' };
+  if (lastError) {
+    return { error: lastError };
   }
 
-  const expiresAt = new Date(getFirstDefined(tokenRow, ['expiresAt', 'expiresat'])).getTime();
-  if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) {
-    return { validationError: 'Reset code expired' };
-  }
-
-  return { tokenRow };
+  return { validationError: 'No active reset code found' };
 }
 
 async function issueSession(userId) {

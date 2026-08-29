@@ -151,6 +151,7 @@ function getResetMailer() {
     host: smtpHost,
     port: smtpPort,
     secure: smtpSecure,
+    family: 4,
     connectionTimeout: 15000,
     greetingTimeout: 15000,
     socketTimeout: 20000,

@@ -296,6 +296,18 @@ export async function requestListingEngagement(token: string, listingId: string)
   });
 }
 
+export async function updateEngagementStatus(
+  token: string,
+  engagementId: string,
+  status: 'accepted' | 'declined' | 'cancelled'
+) {
+  return apiRequest<{ success: true }>(`/api/engagements/${encodeURIComponent(engagementId)}/status`, {
+    method: 'PATCH',
+    token,
+    body: { status },
+  });
+}
+
 export async function sendEngagementMessage(
   token: string,
   engagementId: string,

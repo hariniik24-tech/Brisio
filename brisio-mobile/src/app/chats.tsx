@@ -6,6 +6,7 @@ import {
   ApiEngagement,
   getEngagements,
   sendEngagementMessage,
+  updateEngagementStatus,
 } from '@/constants/api';
 import { Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
@@ -38,6 +39,7 @@ export default function ChatsScreen() {
   const [selectedId, setSelectedId] = useState('');
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
 
   const selected = useMemo(
     () => engagements.find((item) => item.id === selectedId) || null,
@@ -93,6 +95,20 @@ export default function ChatsScreen() {
       setError(err instanceof Error ? err.message : 'Could not send message.');
     } finally {
       setSending(false);
+    }
+  }
+
+  async function changeRequestStatus(status: 'accepted' | 'declined' | 'cancelled') {
+    if (!session.token || !selected) return;
+    setStatusBusy(true);
+    setError('');
+    try {
+      await updateEngagementStatus(session.token, selected.id, status);
+      await loadConversations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not update this request.');
+    } finally {
+      setStatusBusy(false);
     }
   }
 
@@ -153,6 +169,32 @@ export default function ChatsScreen() {
               <ThemedView style={styles.panel}>
                 <ThemedText type="smallBold">{getConversationLabel(selected)}</ThemedText>
                 <ThemedText type="small">{selected.description || 'No listing description.'}</ThemedText>
+
+                {selected.status === 'requested' && selected.listingOwnerId === session.user?.id ? (
+                  <View style={styles.requestActions}>
+                    <ThemedText type="small">Accept the request to confirm that you can help.</ThemedText>
+                    <Pressable
+                      style={[styles.primaryBtn, statusBusy && styles.disabledBtn]}
+                      onPress={() => changeRequestStatus('accepted')}
+                      disabled={statusBusy}>
+                      <ThemedText type="smallBold">{statusBusy ? 'Updating...' : 'Accept request'}</ThemedText>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.linkBtn, statusBusy && styles.disabledBtn]}
+                      onPress={() => changeRequestStatus('declined')}
+                      disabled={statusBusy}>
+                      <ThemedText type="smallBold">Decline request</ThemedText>
+                    </Pressable>
+                  </View>
+                ) : null}
+
+                {selected.status === 'requested' && selected.requesterUserId === session.user?.id ? (
+                  <ThemedText type="small">Request sent. Waiting for the listing owner to respond.</ThemedText>
+                ) : null}
+
+                {selected.status === 'accepted' ? (
+                  <ThemedText type="small">Request accepted. Use this private chat to coordinate pickup or delivery.</ThemedText>
+                ) : null}
 
                 <View style={styles.messageList}>
                   {(selected.messages || []).length === 0 ? (
@@ -228,6 +270,12 @@ const styles = StyleSheet.create({
   },
   messageList: {
     gap: Spacing.two,
+  },
+  requestActions: {
+    gap: Spacing.two,
+  },
+  disabledBtn: {
+    opacity: 0.6,
   },
   messageBubble: {
     borderWidth: 1,

@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ApiListing, blockUser, getListings, reportListing } from '@/constants/api';
+import { ApiListing, getListings, requestListingEngagement } from '@/constants/api';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
 import { useTheme } from '@/hooks/use-theme';
@@ -13,6 +14,7 @@ const INPUT_PLACEHOLDER_COLOR = '#6A7685';
 
 function ExploreContent() {
   const safeAreaInsets = useSafeAreaInsets();
+  const router = useRouter();
   const session = useSessionContext();
   const theme = useTheme();
   const [query, setQuery] = useState('');
@@ -56,48 +58,22 @@ function ExploreContent() {
     }
   }
 
-  async function handleReport(item: ApiListing, reason: string) {
+  async function startPrivateChat(item: ApiListing) {
     if (!session.token) return;
     setActionLoadingId(item.id);
     setError('');
     setStatusMessage('');
     try {
-      await reportListing(session.token, {
-        listingId: item.id,
-        reason,
-        details: `${item.businessName} | ${item.description}`,
+      const response = await requestListingEngagement(session.token, item.id);
+      router.push({
+        pathname: '/chats',
+        params: { engagementId: response.engagementId },
       });
-      setStatusMessage('Report submitted.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not submit report');
+      setError(err instanceof Error ? err.message : 'Could not start private chat.');
     } finally {
       setActionLoadingId('');
     }
-  }
-
-  async function handleBlock(item: ApiListing) {
-    if (!session.token) return;
-    setActionLoadingId(item.id);
-    setError('');
-    setStatusMessage('');
-    try {
-      await blockUser(session.token, { blockedUserId: item.ownerUserId });
-      setStatusMessage('Blocked this user. Their listings are now hidden.');
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not block user');
-    } finally {
-      setActionLoadingId('');
-    }
-  }
-
-  function openReportMenu(item: ApiListing) {
-    Alert.alert('Report listing', 'Choose the reason that best matches this listing.', [
-      { text: 'Spam', onPress: () => void handleReport(item, 'Spam') },
-      { text: 'Inappropriate', onPress: () => void handleReport(item, 'Inappropriate content') },
-      { text: 'Harassment', onPress: () => void handleReport(item, 'Harassment') },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
   }
 
   useEffect(() => {
@@ -190,19 +166,21 @@ function ExploreContent() {
                     </ThemedText>
                     <ThemedText type="small">{item.description}</ThemedText>
                     <ThemedText type="small">{item.location || 'Location not set'}</ThemedText>
-                    {item.ownerUserId !== session.user?.id ? (
+                    {item.ownerUserId !== session.user?.id &&
+                    ((session.user?.role === 'organization' && item.type === 'supply') ||
+                      (session.user?.role === 'business' && item.type === 'demand')) ? (
                       <ThemedView style={styles.actionRow}>
                         <Pressable
                           style={[styles.actionBtn, actionLoadingId === item.id && styles.actionBtnDisabled]}
-                          onPress={() => openReportMenu(item)}
+                          onPress={() => startPrivateChat(item)}
                           disabled={actionLoadingId === item.id}>
-                          <ThemedText type="smallBold">Report</ThemedText>
-                        </Pressable>
-                        <Pressable
-                          style={[styles.actionBtn, styles.blockBtn, actionLoadingId === item.id && styles.actionBtnDisabled]}
-                          onPress={() => handleBlock(item)}
-                          disabled={actionLoadingId === item.id}>
-                          <ThemedText type="smallBold">Block</ThemedText>
+                          <ThemedText type="smallBold">
+                            {actionLoadingId === item.id
+                              ? 'Opening private chat...'
+                              : item.type === 'supply'
+                                ? 'Request this offer'
+                                : 'Offer help'}
+                          </ThemedText>
                         </Pressable>
                       </ThemedView>
                     ) : null}
@@ -296,10 +274,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#C7D0DD',
     backgroundColor: '#FFFFFF',
-  },
-  blockBtn: {
-    backgroundColor: '#FFF5F3',
-    borderColor: '#E8B7AE',
   },
   actionBtnDisabled: {
     opacity: 0.6,

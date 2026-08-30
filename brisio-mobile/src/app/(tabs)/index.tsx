@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -64,6 +64,8 @@ export default function HomeScreen() {
   const [donationSummaryUpdatedAt, setDonationSummaryUpdatedAt] = useState('');
 
   const [form, setForm] = useState<ListingForm>(initialForm);
+  const listingSubmittingRef = useRef(false);
+  const [listingSubmitting, setListingSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
@@ -196,7 +198,7 @@ export default function HomeScreen() {
   }, [session.isAuthenticated, session.token]);
 
   async function submitListing() {
-    if (!session.token || !session.user) return;
+    if (!session.token || !session.user || listingSubmittingRef.current) return;
     setFormError('');
     setFormSuccess('');
 
@@ -205,6 +207,8 @@ export default function HomeScreen() {
       return;
     }
 
+    listingSubmittingRef.current = true;
+    setListingSubmitting(true);
     try {
       const payload: {
         category: string;
@@ -233,6 +237,9 @@ export default function HomeScreen() {
       await Promise.all([loadListings(), loadStats()]);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Could not post listing.');
+    } finally {
+      listingSubmittingRef.current = false;
+      setListingSubmitting(false);
     }
   }
 
@@ -451,9 +458,16 @@ export default function HomeScreen() {
                     onChangeText={(value) => setForm((prev) => ({ ...prev, deliverWithinHours: value }))}
                   />
                 ) : null}
-                <Pressable style={styles.primaryBtn} onPress={submitListing}>
+                <Pressable
+                  style={[styles.primaryBtn, listingSubmitting && styles.disabledBtn]}
+                  onPress={submitListing}
+                  disabled={listingSubmitting}>
                   <ThemedText type="smallBold">
-                    {session.user.role === 'business' ? 'Post offer listing' : 'Post need listing'}
+                    {listingSubmitting
+                      ? 'Posting...'
+                      : session.user.role === 'business'
+                        ? 'Post offer listing'
+                        : 'Post need listing'}
                   </ThemedText>
                 </Pressable>
                 {!!formError && <ThemedText style={styles.errorText}>{formError}</ThemedText>}
@@ -474,7 +488,7 @@ export default function HomeScreen() {
                     <ThemedView key={item.id} style={styles.listingItem}>
                       <ThemedText type="smallBold">{item.businessName}</ThemedText>
                       <ThemedText type="small">
-                        {item.category} | {item.type}
+                        {item.category} | {item.type === 'supply' ? 'Business offer' : 'Nonprofit need'}
                       </ThemedText>
                       <ThemedText type="small">{item.description}</ThemedText>
                       <ThemedText type="small">{item.location}</ThemedText>
@@ -871,6 +885,9 @@ const styles = StyleSheet.create({
   statTileLink: {
     width: '48%',
     minWidth: 140,
+  },
+  disabledBtn: {
+    opacity: 0.6,
   },
   listingItem: {
     borderWidth: 1,

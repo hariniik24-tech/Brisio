@@ -67,6 +67,10 @@ CREATE TABLE IF NOT EXISTS blocks (
   createdAt TEXT NOT NULL
 );
 
+ALTER TABLE blocks ADD COLUMN IF NOT EXISTS "blockerUserId" TEXT;
+ALTER TABLE blocks ADD COLUMN IF NOT EXISTS "blockedUserId" TEXT;
+ALTER TABLE blocks ADD COLUMN IF NOT EXISTS "createdAt" TEXT;
+
 -- Create password reset tokens table
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
   id TEXT PRIMARY KEY,
@@ -110,6 +114,8 @@ CREATE INDEX IF NOT EXISTS idx_sessions_userId ON sessions(userId);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_blocks_blockerUserId ON blocks(blockerUserId);
 CREATE INDEX IF NOT EXISTS idx_blocks_blockedUserId ON blocks(blockedUserId);
+CREATE INDEX IF NOT EXISTS idx_blocks_blocker_compat ON blocks("blockerUserId");
+CREATE INDEX IF NOT EXISTS idx_blocks_blocked_compat ON blocks("blockedUserId");
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_userId ON password_reset_tokens(userId);
 
 -- Create donation records table

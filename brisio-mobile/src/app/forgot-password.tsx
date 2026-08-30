@@ -73,6 +73,10 @@ export default function ForgotPasswordScreen() {
     setBusy(false);
   }
 
+  function handleResetCodeChange(value: string) {
+    setResetCode(value.replace(/\D/g, '').slice(0, 6));
+  }
+
   return (
     <StackScreenShell>
         <Pressable onPress={() => router.push('/')} style={styles.backBtn} hitSlop={10}>
@@ -94,7 +98,10 @@ export default function ForgotPasswordScreen() {
           onChangeText={setEmail}
         />
 
-        <Pressable style={styles.secondaryBtn} onPress={handleSendCode}>
+        <Pressable
+          style={[styles.secondaryBtn, busy && styles.primaryBtnDisabled]}
+          onPress={handleSendCode}
+          disabled={busy}>
           {busy ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Send reset code</ThemedText>}
         </Pressable>
 
@@ -103,19 +110,23 @@ export default function ForgotPasswordScreen() {
             <ThemedText type="small" style={styles.label}>Verification code</ThemedText>
             <TextInput
               style={styles.input}
-              placeholder="Enter code from email"
+              placeholder="Enter 6-digit code"
               placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
               keyboardType="number-pad"
+              maxLength={6}
+              textContentType="oneTimeCode"
+              autoComplete="one-time-code"
               value={resetCode}
-              onChangeText={setResetCode}
+              onChangeText={handleResetCodeChange}
+              onSubmitEditing={continueToReset}
             />
           </>
         ) : null}
 
         <Pressable
-          style={[styles.primaryBtn, (!codeSent || busy) && styles.primaryBtnDisabled]}
+          style={[styles.primaryBtn, (!codeSent || resetCode.length !== 6 || busy) && styles.primaryBtnDisabled]}
           onPress={continueToReset}
-          disabled={!codeSent || busy}>
+          disabled={!codeSent || resetCode.length !== 6 || busy}>
           {busy ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Verify code and continue</ThemedText>}
         </Pressable>
 

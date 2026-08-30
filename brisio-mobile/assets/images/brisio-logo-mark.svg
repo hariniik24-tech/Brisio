@@ -1,0 +1,14 @@
+<svg viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(-102 -65) scale(1.2)">
+    <path d="M265 494C300 378 402 316 512 316C622 316 724 378 759 494" stroke="#FFFFFF" stroke-width="42" stroke-linecap="square" />
+    <path d="M309 466V637M715 466V637" stroke="#FFFFFF" stroke-width="91" stroke-linecap="round" />
+    <path d="M250 656H774" stroke="#FFFFFF" stroke-width="72" stroke-linecap="round" />
+    <path d="M414 611V621M512 603V621M610 611V621" stroke="#FFFFFF" stroke-width="11" stroke-linecap="square" />
+
+    <path d="M512 270C566 270 596 317 591 374C586 429 555 463 512 463C469 463 438 429 433 374C428 317 458 270 512 270Z" fill="#F3C84B" />
+    <path d="M476 292L548 441M538 288L478 443M443 336H582M438 380H586" stroke="#FFF0A6" stroke-width="13" stroke-linecap="round" opacity="0.92" />
+    <path d="M437 353C442 407 465 444 512 469C462 470 426 446 410 408C407 382 417 362 437 353Z" fill="#4CAF73" />
+    <path d="M587 353C582 407 559 444 512 469C562 470 598 446 614 408C617 382 607 362 587 353Z" fill="#2E8B5B" />
+    <path d="M512 463V493" stroke="#398F60" stroke-width="16" stroke-linecap="round" />
+  </g>
+</svg>

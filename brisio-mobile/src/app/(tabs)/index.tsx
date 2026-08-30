@@ -11,6 +11,7 @@ import { useSessionContext } from '@/context/session-context';
 import { Link, useRouter } from 'expo-router';
 
 const INPUT_PLACEHOLDER_COLOR = '#6A7685';
+const DONATION_SUMMARY_FALLBACK_MESSAGE = 'Donation metrics are temporarily unavailable. Please refresh shortly.';
 
 type Stats = {
   total: number;
@@ -30,10 +31,6 @@ type ListingForm = {
   category: string;
   description: string;
   contact: string;
-  street: string;
-  city: string;
-  state: string;
-  zip: string;
   urgencyLevel: 'low' | 'medium' | 'high' | 'critical';
   deliverWithinHours: string;
 };
@@ -46,20 +43,12 @@ const emptyDonationSummary: DonationSummary = {
   completedPickups: 0,
 };
 const initialForm: ListingForm = {
-  category: 'other',
+  category: '',
   description: '',
   contact: '',
-  street: '',
-  city: '',
-  state: '',
-  zip: '',
   urgencyLevel: 'medium',
   deliverWithinHours: '',
 };
-
-function formatAddress(street: string, city: string, stateCode: string, zip: string) {
-  return [street.trim(), city.trim(), stateCode.trim(), zip.trim()].filter(Boolean).join(', ');
-}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -131,14 +120,9 @@ export default function HomeScreen() {
       const response = await getDonationImpactSummary(session.token);
       setDonationSummary(response.summary || emptyDonationSummary);
       setDonationSummaryUpdatedAt(new Date().toISOString());
-    } catch (err) {
+    } catch {
       setDonationSummary(emptyDonationSummary);
-      const message = err instanceof Error ? err.message : 'Could not load donation summary.';
-      setDonationSummaryError(
-        message.includes('Backend route is unavailable')
-          ? 'Donation metrics endpoint is not live on the backend yet. Please redeploy the API service.'
-          : message
-      );
+      setDonationSummaryError(DONATION_SUMMARY_FALLBACK_MESSAGE);
     } finally {
       setDonationSummaryLoading(false);
     }
@@ -204,15 +188,10 @@ export default function HomeScreen() {
         if (!active) return;
         setDonationSummary(response.summary || emptyDonationSummary);
         setDonationSummaryUpdatedAt(new Date().toISOString());
-      } catch (err) {
+      } catch {
         if (!active) return;
         setDonationSummary(emptyDonationSummary);
-        const message = err instanceof Error ? err.message : 'Could not load donation summary.';
-        setDonationSummaryError(
-          message.includes('Backend route is unavailable')
-            ? 'Donation metrics endpoint is not live on the backend yet. Please redeploy the API service.'
-            : message
-        );
+        setDonationSummaryError(DONATION_SUMMARY_FALLBACK_MESSAGE);
       } finally {
         if (active) setDonationSummaryLoading(false);
       }
@@ -232,12 +211,6 @@ export default function HomeScreen() {
       return;
     }
 
-    const listingLocation = formatAddress(form.street, form.city, form.state, form.zip);
-    if (!listingLocation) {
-      setFormError('Street, city, state, and ZIP code are required.');
-      return;
-    }
-
     try {
       const payload: {
         category: string;
@@ -250,7 +223,7 @@ export default function HomeScreen() {
         category: form.category.trim().toLowerCase(),
         description: form.description.trim(),
         contact: form.contact.trim(),
-        location: listingLocation,
+        location: session.user.location,
       };
 
       if (session.user.role === 'organization') {
@@ -355,11 +328,11 @@ export default function HomeScreen() {
             </ThemedText>
           </ThemedView>
 
-          {!session.isAuthenticated ? (
+          {!session.isAuthenticated || !session.user ? (
             <ThemedView type="backgroundElement" style={[styles.panel, styles.authPanel]}>
               <ThemedText type="smallBold">Account access</ThemedText>
               <ThemedText type="small" style={styles.helperText}>
-                Choose whether you want to sign in or create a new account on a dedicated page.
+                Sign in to continue, or create an account to join Brisio.
               </ThemedText>
               <View style={styles.modeRow}>
                 <Pressable style={styles.modeBtn} onPress={() => router.push('/auth?mode=login')}>
@@ -379,7 +352,6 @@ export default function HomeScreen() {
                 <ThemedText type="small">
                   Role: {session.user.role === 'organization' ? 'nonprofit' : session.user.role}
                 </ThemedText>
-                <ThemedText type="small">API endpoint: {endpoint}</ThemedText>
                 <ThemedView style={styles.rolePathPanel}>
                   <ThemedText type="smallBold">
                     {session.user.role === 'organization' ? 'Nonprofit path: Explore + request' : 'Business path: Offer + deliver'}
@@ -405,13 +377,10 @@ export default function HomeScreen() {
                 {session.user.role === 'organization' ? (
                   <Link href="/donation-inbox" asChild>
                     <Pressable style={styles.secondaryBtn}>
-                      <ThemedText type="smallBold">Open donation inbox</ThemedText>
+                      <ThemedText type="smallBold">Open donation inbox & QR scanner</ThemedText>
                     </Pressable>
                   </Link>
                 ) : null}
-                <Pressable style={styles.secondaryBtn} onPress={session.signOut}>
-                  <ThemedText type="smallBold">Sign out</ThemedText>
-                </Pressable>
               </ThemedView>
 
               <ThemedView type="backgroundElement" style={styles.panel}>
@@ -456,12 +425,14 @@ export default function HomeScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Category (space, time, equipment, service, food, other)"
+                  placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                   value={form.category}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, category: value }))}
                 />
                 <TextInput
                   style={[styles.input, styles.multilineInput]}
                   placeholder="Description"
+                  placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                   multiline
                   value={form.description}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, description: value }))}
@@ -469,51 +440,23 @@ export default function HomeScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Contact"
+                  placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                   value={form.contact}
                   onChangeText={(value) => setForm((prev) => ({ ...prev, contact: value }))}
                 />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Street address"
-                  value={form.street}
-                  onChangeText={(value) => setForm((prev) => ({ ...prev, street: value }))}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="City"
-                  value={form.city}
-                  onChangeText={(value) => setForm((prev) => ({ ...prev, city: value }))}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="State"
-                  value={form.state}
-                  onChangeText={(value) => setForm((prev) => ({ ...prev, state: value }))}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="ZIP code"
-                  value={form.zip}
-                  onChangeText={(value) => setForm((prev) => ({ ...prev, zip: value }))}
-                />
-                {session.user.role === 'organization' ? (
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Urgency (low/medium/high/critical)"
-                    value={form.urgencyLevel}
-                    onChangeText={(value) =>
-                      setForm((prev) => ({ ...prev, urgencyLevel: (value as ListingForm['urgencyLevel']) || 'medium' }))
-                    }
-                  />
-                ) : (
+                <ThemedText type="small" style={styles.helperText}>
+                  Location: {session.user.location}
+                </ThemedText>
+                {session.user.role !== 'organization' ? (
                   <TextInput
                     style={styles.input}
                     placeholder="Deliver within hours (optional)"
+                    placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                     keyboardType="numeric"
                     value={form.deliverWithinHours}
                     onChangeText={(value) => setForm((prev) => ({ ...prev, deliverWithinHours: value }))}
                   />
-                )}
+                ) : null}
                 <Pressable style={styles.primaryBtn} onPress={submitListing}>
                   <ThemedText type="smallBold">
                     {session.user.role === 'business' ? 'Post offer listing' : 'Post need listing'}
@@ -608,6 +551,10 @@ export default function HomeScreen() {
                   <ThemedText type="smallBold">Refresh donation metrics</ThemedText>
                 </Pressable>
               </ThemedView>
+
+              <Pressable style={styles.secondaryBtn} onPress={session.signOut}>
+                <ThemedText type="smallBold">Sign out</ThemedText>
+              </Pressable>
             </>
           )}
 

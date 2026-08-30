@@ -67,6 +67,11 @@ function explainSupabaseError(error) {
   return message;
 }
 
+function isMissingDonationRecordsTableError(error) {
+  const message = String(error?.message || error || '');
+  return message.includes("Could not find the table 'public.donation_records' in the schema cache");
+}
+
 async function verifySupabaseSchema() {
   const requiredTables = ['users', 'sessions', 'listings', 'engagements', 'engagement_messages', 'reports', 'blocks', 'password_reset_tokens'];
   for (const table of requiredTables) {
@@ -1273,7 +1278,19 @@ app.post('/api/auth/register', async (req, res) => {
 
     const token = await issueSession(userId);
     appendInstrumentation({ type: 'register', userId, email });
-    res.json({ success: true, token, user: { id: userId, email, role, displayName: name } });
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: userId,
+        email,
+        role,
+        displayName: name,
+        organizationName: organizationName || '',
+        location: location || '',
+        createdAt,
+      },
+    });
   } catch (err) {
     console.error('Register error:', err);
     res.status(500).json({ success: false, error: explainSupabaseError(err) });
@@ -1555,13 +1572,13 @@ app.post('/api/listings', async (req, res, next) => {
     await requireAuth(req, res, () => {});
     if (!req.user) return;
 
-    const { type, category, businessName, description, contact, location, urgent, deliverWithinHours, offerClosesAt, urgencyLevel, resourceName, resourceType, quantity, availabilityNotes, isPrivate, targetOrganizationId } = req.body;
+    const { category, description, contact, urgent, deliverWithinHours, offerClosesAt, urgencyLevel, resourceName, resourceType, quantity, availabilityNotes, isPrivate, targetOrganizationId } = req.body;
+    const type = req.user.role === 'business' ? 'supply' : 'demand';
+    const businessName = req.user.organizationName || req.user.displayName;
+    const location = req.user.location || '';
 
-    if (!type || !['supply', 'demand'].includes(type)) {
-      return res.status(400).json({ success: false, error: 'type must be supply or demand' });
-    }
-    if (!businessName || !description) {
-      return res.status(400).json({ success: false, error: 'businessName and description are required' });
+    if (!description) {
+      return res.status(400).json({ success: false, error: 'description is required' });
     }
 
     const listingId = crypto.randomUUID();
@@ -2645,6 +2662,17 @@ app.get('/api/donations/impact-summary', async (req, res) => {
 
     const { data, error } = await query;
     if (error) {
+      if (isMissingDonationRecordsTableError(error)) {
+        return res.json({
+          success: true,
+          summary: {
+            itemsDonated: 0,
+            estimatedInventoryValue: 0,
+            recipientCount: 0,
+            completedPickups: 0,
+          },
+        });
+      }
       return res.status(500).json({ success: false, error: explainSupabaseError(error) });
     }
 

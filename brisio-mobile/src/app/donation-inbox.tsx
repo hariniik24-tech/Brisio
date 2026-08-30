@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
 import { Link, useRouter } from 'expo-router';
-import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 
 import { StackScreenShell } from '@/components/stack-screen-shell';
 import { ThemedText } from '@/components/themed-text';
@@ -45,7 +45,6 @@ function getDonationNumber(donation: ApiDonation, keys: string[], fallback = 0):
 export default function DonationInboxScreen() {
   const router = useRouter();
   const session = useSessionContext();
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState('');
@@ -53,9 +52,9 @@ export default function DonationInboxScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [donations, setDonations] = useState<ApiDonation[]>([]);
   const [tokenByDonationId, setTokenByDonationId] = useState<Record<string, string>>({});
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [scannerDonationId, setScannerDonationId] = useState('');
-  const [showScanner, setShowScanner] = useState(false);
-  const [scannerLocked, setScannerLocked] = useState(false);
+  const [hasScanned, setHasScanned] = useState(false);
 
   const postedCount = useMemo(
     () => donations.filter((d) => getDonationText(d, ['status']) === 'posted').length,
@@ -75,47 +74,6 @@ export default function DonationInboxScreen() {
     } finally {
       setLoading(false);
     }
-  }
-
-  async function openScanner(donationId: string) {
-    if (Platform.OS === 'web') {
-      setErrorMessage('QR scanning is available on iOS/Android app builds.');
-      return;
-    }
-    if (!cameraPermission?.granted) {
-      const permissionResult = await requestCameraPermission();
-      if (!permissionResult.granted) {
-        setErrorMessage('Camera permission is required to scan QR codes.');
-        return;
-      }
-    }
-    setScannerDonationId(donationId);
-    setShowScanner(true);
-    setScannerLocked(false);
-    setErrorMessage('Point the camera at the donor QR code.');
-  }
-
-  function parseHandoffToken(scanData: string) {
-    const value = String(scanData || '').trim();
-    if (value.startsWith(HANDOFF_QR_PREFIX)) {
-      return value.slice(HANDOFF_QR_PREFIX.length).trim();
-    }
-    return value;
-  }
-
-  async function handleBarcodeScanned(scan: BarcodeScanningResult) {
-    if (scannerLocked || !scannerDonationId) return;
-    const token = parseHandoffToken(String(scan.data || ''));
-    if (!token) return;
-
-    setScannerLocked(true);
-    setShowScanner(false);
-    setTokenByDonationId((prev) => ({
-      ...prev,
-      [scannerDonationId]: token,
-    }));
-    setStatusMessage('QR code scanned. Confirm the handoff to complete pickup.');
-    setScannerLocked(false);
   }
 
   useEffect(() => {
@@ -201,6 +159,32 @@ export default function DonationInboxScreen() {
     }
   }
 
+  async function handleOpenScanner(donationId: string) {
+    if (!cameraPermission?.granted) {
+      const permission = await requestCameraPermission();
+      if (!permission.granted) {
+        setErrorMessage('Camera permission is required to scan the handoff QR code.');
+        return;
+      }
+    }
+    setErrorMessage('');
+    setHasScanned(false);
+    setScannerDonationId(donationId);
+  }
+
+  function handleHandoffQrScanned({ data }: { data: string }) {
+    if (hasScanned || !scannerDonationId) return;
+    const token = data.startsWith(HANDOFF_QR_PREFIX) ? data.slice(HANDOFF_QR_PREFIX.length) : '';
+    if (!token) {
+      setErrorMessage('This is not a Brisio handoff QR code.');
+      return;
+    }
+    setHasScanned(true);
+    setTokenByDonationId((previous) => ({ ...previous, [scannerDonationId]: token }));
+    setScannerDonationId('');
+    setStatusMessage('Handoff QR scanned. Confirm the handoff when the quantity is correct.');
+  }
+
   async function handleExportCsv() {
     if (!session.token) return;
     setLoading(true);
@@ -261,7 +245,7 @@ export default function DonationInboxScreen() {
   return (
     <StackScreenShell>
       <ThemedText type="subtitle">Donation Inbox</ThemedText>
-      <ThemedText type="small">Review offers, accept/decline, then confirm handoff with a one-time token.</ThemedText>
+      <ThemedText type="small">Review each offer, accept it, then scan the donor&apos;s QR code to confirm the handoff.</ThemedText>
 
       <View style={styles.metricsRow}>
         <View style={styles.metricCard}>
@@ -280,24 +264,6 @@ export default function DonationInboxScreen() {
       <Pressable style={styles.secondaryBtn} onPress={handleExportCsv}>
         <ThemedText type="smallBold">Export assigned donations as CSV</ThemedText>
       </Pressable>
-
-      {showScanner ? (
-        <View style={styles.scannerCard}>
-          <ThemedText type="smallBold">QR scanner active</ThemedText>
-          <ThemedText type="small">Scan the donor QR code to fill the handoff token automatically.</ThemedText>
-          <CameraView
-            style={styles.cameraView}
-            facing="back"
-            onBarcodeScanned={handleBarcodeScanned}
-            barcodeScannerSettings={{
-              barcodeTypes: ['qr', 'upc_a', 'upc_e', 'ean13', 'ean8'],
-            }}
-          />
-          <Pressable style={styles.secondaryBtn} onPress={() => setShowScanner(false)}>
-            <ThemedText type="smallBold">Close scanner</ThemedText>
-          </Pressable>
-        </View>
-      ) : null}
 
       {!!statusMessage ? <ThemedText type="small" style={styles.successText}>{statusMessage}</ThemedText> : null}
       {!!errorMessage ? <ThemedText type="small" style={styles.errorText}>{errorMessage}</ThemedText> : null}
@@ -346,6 +312,19 @@ export default function DonationInboxScreen() {
 
               {status === 'accepted' ? (
                 <>
+                  {scannerDonationId === donationId ? (
+                    <View style={styles.scannerCard}>
+                      <CameraView
+                        style={styles.camera}
+                        facing="back"
+                        onBarcodeScanned={hasScanned ? undefined : handleHandoffQrScanned}
+                        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                      />
+                      <Pressable style={styles.secondaryBtn} onPress={() => setScannerDonationId('')}>
+                        <ThemedText type="smallBold">Cancel scan</ThemedText>
+                      </Pressable>
+                    </View>
+                  ) : null}
                   <ThemedText type="small" style={styles.label}>Handoff token from donor</ThemedText>
                   <TextInput
                     style={styles.input}
@@ -360,8 +339,8 @@ export default function DonationInboxScreen() {
                     placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                     autoCapitalize="none"
                   />
-                  <Pressable style={styles.secondaryBtn} onPress={() => openScanner(donationId)}>
-                    <ThemedText type="smallBold">Scan QR instead</ThemedText>
+                  <Pressable style={styles.secondaryBtn} onPress={() => handleOpenScanner(donationId)}>
+                    <ThemedText type="smallBold">Scan QR code</ThemedText>
                   </Pressable>
                   <Pressable
                     style={[styles.actionBtn, busyId === donationId && styles.actionBtnDisabled]}
@@ -401,24 +380,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     gap: 4,
   },
+  scannerCard: {
+    borderWidth: 1,
+    borderColor: '#C9D8EC',
+    borderRadius: Spacing.three,
+    overflow: 'hidden',
+    gap: Spacing.two,
+    paddingBottom: Spacing.two,
+    backgroundColor: '#F3F8FF',
+  },
+  camera: {
+    height: 260,
+    width: '100%',
+  },
   loadingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.two,
-  },
-  scannerCard: {
-    borderWidth: 1,
-    borderColor: '#D6DFEA',
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
-    gap: Spacing.two,
-    backgroundColor: '#FAFCFF',
-  },
-  cameraView: {
-    width: '100%',
-    height: 260,
-    borderRadius: Spacing.three,
-    overflow: 'hidden',
   },
   secondaryBtn: {
     alignItems: 'center',

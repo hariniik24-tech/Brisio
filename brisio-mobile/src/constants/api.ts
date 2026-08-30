@@ -122,6 +122,7 @@ type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   token?: string;
   body?: unknown;
+  timeoutMs?: number;
 };
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -132,11 +133,27 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     headers.Authorization = `Bearer ${options.token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: options.method || 'GET',
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  const abortController = options.timeoutMs ? new AbortController() : undefined;
+  const timeout = options.timeoutMs
+    ? setTimeout(() => abortController?.abort(), options.timeoutMs)
+    : undefined;
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      method: options.method || 'GET',
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: abortController?.signal,
+    });
+  } catch (error) {
+    if (abortController?.signal.aborted) {
+      throw new Error('The request took too long. Please try again.');
+    }
+    throw error;
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 
   const rawBody = await response.text();
   let payload: any = {};
@@ -187,6 +204,7 @@ export async function requestPasswordReset(input: { email: string }) {
   return apiRequest<{ success: true; message: string; resetCode?: string; expiresAt?: string }>('/api/auth/forgot-password', {
     method: 'POST',
     body: input,
+    timeoutMs: 25000,
   });
 }
 

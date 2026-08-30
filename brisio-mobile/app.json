@@ -11,7 +11,7 @@
       "icon": "./assets/images/icon.png",
       "supportsTablet": true,
       "bundleIdentifier": "com.brisio.app",
-      "buildNumber": "31",
+      "buildNumber": "41",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -36,7 +36,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Brisio to scan barcodes for donation inventory."
+          "cameraPermission": "Allow Brisio to scan barcodes for donation inventory.",
+          "barcodeScannerEnabled": true
         }
       ],
       [
@@ -44,7 +45,7 @@
         {
           "backgroundColor": "#208AEF",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 160
         }
       ]
     ],

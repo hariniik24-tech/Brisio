@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, Share, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import QRCode from 'react-native-qrcode-svg';
 
 import { StackScreenShell } from '@/components/stack-screen-shell';
@@ -10,6 +10,7 @@ import {
   createDonationRecord,
   exportDonationRecordsCsv,
   generateDonationHandoffToken,
+  getDonationImpactSummary,
   getDonations,
   getOrganizations,
   lookupProductByBarcode,
@@ -23,20 +24,24 @@ import { useSessionContext } from '@/context/session-context';
 const INPUT_PLACEHOLDER_COLOR = '#6A7685';
 const HANDOFF_QR_PREFIX = 'BRISIO_HANDOFF:';
 
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+}
+
 export default function DonateInventoryScreen() {
   const router = useRouter();
   const session = useSessionContext();
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   const [barcode, setBarcode] = useState('');
-  const [showScanner, setShowScanner] = useState(false);
-  const [scannerLocked, setScannerLocked] = useState(false);
   const [lookupBusy, setLookupBusy] = useState(false);
   const [product, setProduct] = useState<ApiScannedProduct | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [hasScanned, setHasScanned] = useState(false);
 
   const [quantity, setQuantity] = useState('');
-  const [unit, setUnit] = useState('units');
-  const [donorLocationId, setDonorLocationId] = useState('store-001');
+  const [unit, setUnit] = useState('');
+  const [estimatedUnitValue, setEstimatedUnitValue] = useState('');
   const [conditionNotes, setConditionNotes] = useState('');
 
   const [organizations, setOrganizations] = useState<ApiOrganization[]>([]);
@@ -48,11 +53,17 @@ export default function DonateInventoryScreen() {
 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [impactSummary, setImpactSummary] = useState({
+    itemsDonated: 0,
+    estimatedInventoryValue: 0,
+    recipientCount: 0,
+    completedPickups: 0,
+  });
 
   const canSubmit = useMemo(() => {
     const qty = Number(quantity);
-    return !!product && !!recipientOrgId && Number.isFinite(qty) && qty > 0 && !!donorLocationId.trim();
-  }, [product, quantity, recipientOrgId, donorLocationId]);
+    return !!product && !!recipientOrgId && Number.isFinite(qty) && qty > 0;
+  }, [product, quantity, recipientOrgId]);
 
   useEffect(() => {
     if (!session.token) return;
@@ -94,6 +105,55 @@ export default function DonateInventoryScreen() {
     };
   }, [session.token]);
 
+  useEffect(() => {
+    if (!session.token) return;
+    let active = true;
+    (async () => {
+      try {
+        const response = await getDonationImpactSummary(session.token!);
+        if (active) setImpactSummary(response.summary);
+      } catch {
+        if (active) {
+          setImpactSummary({
+            itemsDonated: 0,
+            estimatedInventoryValue: 0,
+            recipientCount: 0,
+            completedPickups: 0,
+          });
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [session.token]);
+
+  const recipientTotals = useMemo(() => {
+    const organizationNameById = new Map(
+      organizations.map((organization) => [organization.id, organization.organizationName || organization.displayName])
+    );
+    const totalsByRecipient = new Map<string, { name: string; quantity: number; value: number }>();
+
+    for (const donation of myDonations) {
+      const row = donation as unknown as Record<string, unknown>;
+      const recipientId = String(row.recipientOrgId || row.recipientorgid || '');
+      if (!recipientId) continue;
+      const current = totalsByRecipient.get(recipientId) || {
+        name: organizationNameById.get(recipientId) || 'Nonprofit',
+        quantity: 0,
+        value: 0,
+      };
+      current.quantity += Number(row.quantity || 0);
+      current.value += Number(row.estimatedTotalValue || row.estimatedtotalvalue || 0);
+      totalsByRecipient.set(recipientId, current);
+    }
+
+    return [...totalsByRecipient.entries()]
+      .map(([id, total]) => ({ id, ...total }))
+      .sort((first, second) => second.value - first.value || second.quantity - first.quantity);
+  }, [myDonations, organizations]);
+
   async function runLookup(cleanedBarcode: string) {
     if (!session.token) return;
     const cleaned = cleanedBarcode.replace(/\D/g, '');
@@ -121,33 +181,23 @@ export default function DonateInventoryScreen() {
     await runLookup(barcode);
   }
 
-  async function openScanner() {
-    if (Platform.OS === 'web') {
-      setMessage('Camera barcode scanning is available on iOS/Android app builds.');
-      return;
-    }
+  async function handleOpenScanner() {
     if (!cameraPermission?.granted) {
-      const permissionResult = await requestCameraPermission();
-      if (!permissionResult.granted) {
-        setMessage('Camera permission is required to scan barcodes.');
+      const permission = await requestCameraPermission();
+      if (!permission.granted) {
+        setMessage('Camera permission is required to scan food barcodes.');
         return;
       }
     }
-    setShowScanner(true);
-    setScannerLocked(false);
-    setMessage('Point camera at UPC/EAN barcode.');
+    setHasScanned(false);
+    setScannerOpen(true);
   }
 
-  async function handleBarcodeScanned(scan: BarcodeScanningResult) {
-    if (scannerLocked) return;
-    const code = String(scan.data || '').replace(/\D/g, '');
-    if (!code) return;
-
-    setScannerLocked(true);
-    setShowScanner(false);
-    setBarcode(code);
-    await runLookup(code);
-    setScannerLocked(false);
+  async function handleBarcodeScanned({ data }: { data: string }) {
+    if (hasScanned) return;
+    setHasScanned(true);
+    setScannerOpen(false);
+    await runLookup(data);
   }
 
   async function handleCreateDonation() {
@@ -161,21 +211,28 @@ export default function DonateInventoryScreen() {
     setBusy(true);
     setMessage('');
     try {
+      const parsedEstimatedUnitValue = Number(estimatedUnitValue);
       const response = await createDonationRecord(session.token, {
-        donorLocationId: donorLocationId.trim(),
+        donorLocationId: session.user?.id || 'primary',
         recipientOrgId,
         item: product,
         quantity: qty,
         unit: unit.trim() || 'units',
         conditionNotes: conditionNotes.trim(),
+        estimatedUnitValue: Number.isFinite(parsedEstimatedUnitValue) && parsedEstimatedUnitValue >= 0
+          ? parsedEstimatedUnitValue
+          : undefined,
       });
 
       setMessage(`Donation record created: ${response.donation.id}`);
       setQuantity('');
+      setEstimatedUnitValue('');
       setConditionNotes('');
       try {
         const latest = await getDonations(session.token);
         setMyDonations(latest.donations || []);
+        const summary = await getDonationImpactSummary(session.token);
+        setImpactSummary(summary.summary);
       } catch {
         setMyDonations((prev) => prev);
       }
@@ -259,7 +316,52 @@ export default function DonateInventoryScreen() {
           <ThemedText type="smallBold">Back to Home</ThemedText>
         </Pressable>
         <ThemedText type="subtitle">Donate Inventory</ThemedText>
-        <ThemedText type="small">Scan or enter an existing UPC barcode to start a donation.</ThemedText>
+        <ThemedText type="small">Scan food at pickup, assign a nonprofit, and create a delivery record.</ThemedText>
+
+        <View style={styles.summaryCard}>
+          <ThemedText type="smallBold">Donation reporting</ThemedText>
+          <View style={styles.metricsRow}>
+            <View style={styles.metric}>
+              <ThemedText type="small">Food items</ThemedText>
+              <ThemedText type="smallBold">{impactSummary.itemsDonated}</ThemedText>
+            </View>
+            <View style={styles.metric}>
+              <ThemedText type="small">Recipients</ThemedText>
+              <ThemedText type="smallBold">{impactSummary.recipientCount}</ThemedText>
+            </View>
+            <View style={styles.metric}>
+              <ThemedText type="small">Received</ThemedText>
+              <ThemedText type="smallBold">{impactSummary.completedPickups}</ThemedText>
+            </View>
+          </View>
+          <ThemedText type="small">Recorded value: {formatCurrency(impactSummary.estimatedInventoryValue)}</ThemedText>
+          <ThemedText type="small">Use your exported records with a tax professional to determine any eligible deduction.</ThemedText>
+        </View>
+
+        {recipientTotals.length > 0 ? (
+          <View style={styles.card}>
+            <ThemedText type="smallBold">By nonprofit</ThemedText>
+            {recipientTotals.slice(0, 5).map((total) => (
+              <ThemedText key={total.id} type="small">
+                {total.name}: {total.quantity} items, {formatCurrency(total.value)} recorded value
+              </ThemedText>
+            ))}
+          </View>
+        ) : null}
+
+        {scannerOpen ? (
+          <View style={styles.scannerCard}>
+            <CameraView
+              style={styles.camera}
+              facing="back"
+              onBarcodeScanned={hasScanned ? undefined : handleBarcodeScanned}
+              barcodeScannerSettings={{ barcodeTypes: ['upc_a', 'upc_e', 'ean13', 'ean8', 'code128'] }}
+            />
+            <Pressable style={styles.secondaryBtn} onPress={() => setScannerOpen(false)}>
+              <ThemedText type="smallBold">Cancel scan</ThemedText>
+            </Pressable>
+          </View>
+        ) : null}
 
         <ThemedText type="small" style={styles.label}>UPC or GTIN</ThemedText>
         <TextInput
@@ -271,26 +373,9 @@ export default function DonateInventoryScreen() {
           placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
         />
 
-        {showScanner ? (
-          <View style={styles.scannerCard}>
-            <ThemedText type="smallBold">Scanner active</ThemedText>
-            <CameraView
-              style={styles.cameraView}
-              facing="back"
-              onBarcodeScanned={handleBarcodeScanned}
-              barcodeScannerSettings={{
-                barcodeTypes: ['upc_a', 'upc_e', 'ean13', 'ean8'],
-              }}
-            />
-            <Pressable style={styles.secondaryBtn} onPress={() => setShowScanner(false)}>
-              <ThemedText type="smallBold">Close scanner</ThemedText>
-            </Pressable>
-          </View>
-        ) : (
-          <Pressable style={styles.secondaryBtn} onPress={openScanner} disabled={lookupBusy || busy}>
-            <ThemedText type="smallBold">Open barcode scanner</ThemedText>
-          </Pressable>
-        )}
+        <Pressable style={styles.secondaryBtn} onPress={handleOpenScanner} disabled={lookupBusy || busy}>
+          <ThemedText type="smallBold">Scan food barcode</ThemedText>
+        </Pressable>
 
         <Pressable style={styles.secondaryBtn} onPress={handleLookup} disabled={lookupBusy || busy}>
           {lookupBusy ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Identify item</ThemedText>}
@@ -316,21 +401,25 @@ export default function DonateInventoryScreen() {
           placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
         />
 
-        <ThemedText type="small" style={styles.label}>Unit</ThemedText>
+        <ThemedText type="small" style={styles.label}>Estimated value per unit (optional)</ThemedText>
+        <TextInput
+          style={styles.input}
+          value={estimatedUnitValue}
+          onChangeText={setEstimatedUnitValue}
+          keyboardType="decimal-pad"
+          placeholder="0.00"
+          placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+        />
+        {Number.isFinite(Number(quantity)) && Number.isFinite(Number(estimatedUnitValue)) && Number(quantity) > 0 && Number(estimatedUnitValue) >= 0 ? (
+          <ThemedText type="small">Recorded value for this donation: {formatCurrency(Number(quantity) * Number(estimatedUnitValue))}</ThemedText>
+        ) : null}
+
+        <ThemedText type="small" style={styles.label}>Quantity type</ThemedText>
         <TextInput
           style={styles.input}
           value={unit}
           onChangeText={setUnit}
-          placeholder="units"
-          placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-        />
-
-        <ThemedText type="small" style={styles.label}>Donor location ID</ThemedText>
-        <TextInput
-          style={styles.input}
-          value={donorLocationId}
-          onChangeText={setDonorLocationId}
-          placeholder="store-001"
+          placeholder="Example: cases, boxes, pounds, or items"
           placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
         />
 
@@ -470,6 +559,35 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: '#FAFCFF',
   },
+  summaryCard: {
+    borderWidth: 1,
+    borderColor: '#BFD4EA',
+    borderRadius: Spacing.three,
+    padding: Spacing.three,
+    gap: Spacing.two,
+    backgroundColor: '#F3F8FF',
+  },
+  metricsRow: {
+    flexDirection: 'row',
+    gap: Spacing.one,
+  },
+  metric: {
+    flex: 1,
+    gap: 2,
+  },
+  scannerCard: {
+    borderWidth: 1,
+    borderColor: '#C9D8EC',
+    borderRadius: Spacing.three,
+    overflow: 'hidden',
+    gap: Spacing.two,
+    paddingBottom: Spacing.two,
+    backgroundColor: '#F3F8FF',
+  },
+  camera: {
+    height: 280,
+    width: '100%',
+  },
   sectionDivider: {
     borderBottomWidth: 1,
     borderBottomColor: '#D6DFEA',
@@ -490,20 +608,6 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.two,
     borderTopWidth: 1,
     borderTopColor: '#D7E4F5',
-  },
-  scannerCard: {
-    borderWidth: 1,
-    borderColor: '#D6DFEA',
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
-    gap: Spacing.two,
-    backgroundColor: '#FAFCFF',
-  },
-  cameraView: {
-    width: '100%',
-    height: 260,
-    borderRadius: Spacing.three,
-    overflow: 'hidden',
   },
   secondaryBtn: {
     alignItems: 'center',

@@ -103,8 +103,10 @@ export default function AuthScreen() {
   }
 
   function openForgotPassword() {
-    const query = email.trim() ? `?email=${encodeURIComponent(email.trim())}` : '';
-    router.push(`/forgot-password${query}`);
+    router.push({
+      pathname: '/forgot-password',
+      params: email.trim() ? { email: email.trim() } : undefined,
+    });
   }
 
   return (

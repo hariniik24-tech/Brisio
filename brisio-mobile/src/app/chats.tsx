@@ -4,7 +4,10 @@ import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rout
 
 import {
   ApiEngagement,
+  ApiListing,
   getEngagements,
+  getListings,
+  requestListingEngagement,
   sendEngagementMessage,
   updateEngagementStatus,
 } from '@/constants/api';
@@ -45,7 +48,9 @@ export default function ChatsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [engagements, setEngagements] = useState<ApiEngagement[]>([]);
+  const [availableListings, setAvailableListings] = useState<ApiListing[]>([]);
   const [selectedId, setSelectedId] = useState('');
+  const [startingListingId, setStartingListingId] = useState('');
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
@@ -55,14 +60,34 @@ export default function ChatsScreen() {
     [engagements, selectedId]
   );
 
+  const chatOptions = useMemo(() => {
+    const user = session.user;
+    if (!user) return [];
+    const activeListingIds = new Set(
+      engagements
+        .filter((item) => !['declined', 'cancelled', 'completed'].includes(item.status))
+        .map((item) => item.listingId)
+    );
+    return availableListings.filter((listing) => {
+      const oppositeRoleListing =
+        (user.role === 'organization' && listing.type === 'supply') ||
+        (user.role === 'business' && listing.type === 'demand');
+      return listing.ownerUserId !== user.id && oppositeRoleListing && !activeListingIds.has(listing.id);
+    });
+  }, [availableListings, engagements, session.user]);
+
   const loadConversations = useCallback(async (showLoading = true) => {
     if (!session.token) return false;
     if (showLoading) setLoading(true);
     setError('');
     try {
-      const response = await getEngagements(session.token);
+      const [response, listingsResponse] = await Promise.all([
+        getEngagements(session.token),
+        getListings(session.token),
+      ]);
       const rows = response.engagements || [];
       setEngagements(rows);
+      setAvailableListings(listingsResponse.listings || []);
 
       const requestedId = typeof engagementId === 'string' ? engagementId : '';
       setSelectedId((currentId) => {
@@ -120,6 +145,22 @@ export default function ChatsScreen() {
     }
   }
 
+  async function startChat(listing: ApiListing) {
+    if (!session.token) return;
+    setStartingListingId(listing.id);
+    setError('');
+    try {
+      const response = await requestListingEngagement(session.token, listing.id);
+      await loadConversations(false);
+      setSelectedId(response.engagementId);
+      await refreshChats();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start this chat.');
+    } finally {
+      setStartingListingId('');
+    }
+  }
+
   async function changeRequestStatus(status: 'accepted' | 'declined' | 'cancelled') {
     if (!session.token || !selected) return;
     setStatusBusy(true);
@@ -157,6 +198,32 @@ export default function ChatsScreen() {
 
       <ThemedText type="subtitle">Chats</ThemedText>
 
+      <ThemedView style={styles.startPanel}>
+        <ThemedText type="smallBold">Start a new chat</ThemedText>
+        {chatOptions.length === 0 ? (
+          <ThemedText style={styles.startEmptyText}>No new matching listings are available.</ThemedText>
+        ) : (
+          chatOptions.slice(0, 10).map((listing) => (
+            <View key={listing.id} style={styles.startListingRow}>
+              <View style={styles.startListingDetails}>
+                <ThemedText type="smallBold">{listing.businessName}</ThemedText>
+                <ThemedText style={styles.threadPreview} numberOfLines={2}>{listing.description}</ThemedText>
+                <ThemedText style={styles.statusText}>{listing.category} · {listing.location || 'Location not set'}</ThemedText>
+              </View>
+              <Pressable
+                accessibilityLabel={`Start chat with ${listing.businessName}`}
+                style={[styles.startBtn, startingListingId === listing.id && styles.disabledBtn]}
+                onPress={() => startChat(listing)}
+                disabled={Boolean(startingListingId)}>
+                <ThemedText style={styles.startBtnText}>
+                  {startingListingId === listing.id ? 'Starting...' : 'Start'}
+                </ThemedText>
+              </Pressable>
+            </View>
+          ))
+        )}
+      </ThemedView>
+
       {loading ? (
         <View style={styles.loadingRow}>
           <ActivityIndicator size="small" />
@@ -165,7 +232,7 @@ export default function ChatsScreen() {
       ) : engagements.length === 0 ? (
         <ThemedView style={styles.emptyPanel}>
           <ThemedText type="small">No private conversations yet.</ThemedText>
-          <ThemedText type="small">Open Explore and request an offer or offer help to begin.</ThemedText>
+          <ThemedText type="small">Choose a listing from Start a new chat above.</ThemedText>
         </ThemedView>
       ) : (
         <>
@@ -299,6 +366,44 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     gap: Spacing.two,
     backgroundColor: '#FAFCFF',
+  },
+  startPanel: {
+    borderWidth: 1,
+    borderColor: '#DCE4EE',
+    borderRadius: Spacing.three,
+    padding: Spacing.three,
+    gap: Spacing.two,
+    backgroundColor: '#FFFFFF',
+  },
+  startEmptyText: {
+    color: '#6A7685',
+    fontSize: 13,
+  },
+  startListingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.two,
+    borderTopWidth: 1,
+    borderTopColor: '#E4E9F0',
+  },
+  startListingDetails: {
+    flex: 1,
+    gap: 3,
+  },
+  startBtn: {
+    minWidth: 64,
+    minHeight: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.three,
+    backgroundColor: '#3478C9',
+  },
+  startBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   threadPanel: {
     overflow: 'hidden',

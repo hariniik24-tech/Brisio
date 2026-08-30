@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ApiListing, getListings, requestListingEngagement } from '@/constants/api';
+import { ApiListing, getListings } from '@/constants/api';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
 import { useTheme } from '@/hooks/use-theme';
@@ -14,14 +13,11 @@ const INPUT_PLACEHOLDER_COLOR = '#6A7685';
 
 function ExploreContent() {
   const safeAreaInsets = useSafeAreaInsets();
-  const router = useRouter();
   const session = useSessionContext();
   const theme = useTheme();
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [statusMessage, setStatusMessage] = useState('');
-  const [actionLoadingId, setActionLoadingId] = useState('');
   const [listings, setListings] = useState<ApiListing[]>([]);
 
   const insets = {
@@ -46,7 +42,6 @@ function ExploreContent() {
     if (!session.token) return;
     setLoading(true);
     setError('');
-    setStatusMessage('');
     try {
       const result = await getListings(session.token);
       setListings(result.listings || []);
@@ -55,24 +50,6 @@ function ExploreContent() {
       setError(err instanceof Error ? err.message : 'Could not load listings');
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function startPrivateChat(item: ApiListing) {
-    if (!session.token) return;
-    setActionLoadingId(item.id);
-    setError('');
-    setStatusMessage('');
-    try {
-      const response = await requestListingEngagement(session.token, item.id);
-      router.push({
-        pathname: '/messages',
-        params: { engagementId: response.engagementId },
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start private chat.');
-    } finally {
-      setActionLoadingId('');
     }
   }
 
@@ -143,7 +120,6 @@ function ExploreContent() {
               <Pressable style={styles.refreshBtn} onPress={loadData}>
                 <ThemedText type="smallBold">Refresh</ThemedText>
               </Pressable>
-              {!!statusMessage && <ThemedText style={styles.statusText}>{statusMessage}</ThemedText>}
               {!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
             </ThemedView>
 
@@ -166,24 +142,6 @@ function ExploreContent() {
                     </ThemedText>
                     <ThemedText type="small">{item.description}</ThemedText>
                     <ThemedText type="small">{item.location || 'Location not set'}</ThemedText>
-                    {item.ownerUserId !== session.user?.id &&
-                    ((session.user?.role === 'organization' && item.type === 'supply') ||
-                      (session.user?.role === 'business' && item.type === 'demand')) ? (
-                      <ThemedView style={styles.actionRow}>
-                        <Pressable
-                          style={[styles.actionBtn, actionLoadingId === item.id && styles.actionBtnDisabled]}
-                          onPress={() => startPrivateChat(item)}
-                          disabled={actionLoadingId === item.id}>
-                          <ThemedText type="smallBold">
-                            {actionLoadingId === item.id
-                              ? 'Opening private chat...'
-                              : item.type === 'supply'
-                                ? 'Request this offer'
-                                : 'Offer help'}
-                          </ThemedText>
-                        </Pressable>
-                      </ThemedView>
-                    ) : null}
                   </ThemedView>
                 ))
               )}
@@ -260,26 +218,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     gap: Spacing.one,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    paddingTop: Spacing.one,
-  },
-  actionBtn: {
-    flex: 1,
-    alignItems: 'center',
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderWidth: 1,
-    borderColor: '#C7D0DD',
-    backgroundColor: '#FFFFFF',
-  },
-  actionBtnDisabled: {
-    opacity: 0.6,
-  },
-  statusText: {
-    color: '#1C6B47',
   },
   errorText: {
     color: '#B54840',

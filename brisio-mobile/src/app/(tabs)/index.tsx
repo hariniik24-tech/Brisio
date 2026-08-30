@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ApiListing, createListing, getDonationImpactSummary, getListings, requestListingEngagement } from '@/constants/api';
+import { ApiListing, createListing, getDonationImpactSummary, getListings } from '@/constants/api';
 import { API_BASE_URL } from '@/constants/config';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
@@ -57,7 +57,6 @@ export default function HomeScreen() {
 
   const [listings, setListings] = useState<ApiListing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(false);
-  const [chatBusyListingId, setChatBusyListingId] = useState('');
   const [donationSummary, setDonationSummary] = useState<DonationSummary>(emptyDonationSummary);
   const [donationSummaryLoading, setDonationSummaryLoading] = useState(false);
   const [donationSummaryError, setDonationSummaryError] = useState('');
@@ -279,25 +278,6 @@ export default function HomeScreen() {
     }
   }
 
-  async function startPrivateChatFromListing(listingId: string) {
-    if (!session.token) return;
-    setFormError('');
-    setFormSuccess('');
-    setChatBusyListingId(listingId);
-    try {
-      const response = await requestListingEngagement(session.token, listingId);
-      setFormSuccess('Private chat request sent. Opening conversation...');
-      router.push({
-        pathname: '/messages',
-        params: { engagementId: response.engagementId },
-      });
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not start private chat.');
-    } finally {
-      setChatBusyListingId('');
-    }
-  }
-
   if (session.booting) {
     return (
       <ThemedView style={styles.centerLoader}>
@@ -355,19 +335,14 @@ export default function HomeScreen() {
                 </ThemedText>
                 <ThemedView style={styles.rolePathPanel}>
                   <ThemedText type="smallBold">
-                    {session.user.role === 'organization' ? 'Nonprofit path: Explore + request' : 'Business path: Offer + deliver'}
+                    {session.user.role === 'organization' ? 'Nonprofit path: Explore + Chats' : 'Business path: Offer + Chats'}
                   </ThemedText>
                   <ThemedText type="small" style={styles.rolePathText}>
                     {session.user.role === 'organization'
-                      ? 'Focus on exploring active offers and requesting what your organization needs.'
-                      : 'Focus on posting available resources and coordinating delivery quickly.'}
+                      ? 'Explore active offers, then open Chats to send a request.'
+                      : 'Post available resources, then use Chats to coordinate accepted requests.'}
                   </ThemedText>
                 </ThemedView>
-                <Link href="/messages" asChild>
-                  <Pressable style={styles.primaryBtn}>
-                    <ThemedText type="smallBold">Open private chats</ThemedText>
-                  </Pressable>
-                </Link>
                 {session.user.role === 'business' ? (
                   <Link href="/donate-inventory" asChild>
                     <Pressable style={styles.secondaryBtn}>
@@ -492,15 +467,6 @@ export default function HomeScreen() {
                       </ThemedText>
                       <ThemedText type="small">{item.description}</ThemedText>
                       <ThemedText type="small">{item.location}</ThemedText>
-                      {session.user && item.ownerUserId !== session.user.id ? (
-                        <Pressable
-                          style={styles.secondaryBtn}
-                          onPress={() => startPrivateChatFromListing(item.id)}>
-                          <ThemedText type="smallBold">
-                            {chatBusyListingId === item.id ? 'Starting chat...' : 'Start private chat'}
-                          </ThemedText>
-                        </Pressable>
-                      ) : null}
                     </ThemedView>
                   ))
                 )}

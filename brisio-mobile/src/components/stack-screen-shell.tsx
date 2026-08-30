@@ -17,6 +17,9 @@ export function StackScreenShell({ children, footer }: StackScreenShellProps) {
   return (
     <ScrollView
       style={[styles.scrollView, { backgroundColor: theme.background }]}
+      automaticallyAdjustKeyboardInsets
+      keyboardDismissMode="interactive"
+      keyboardShouldPersistTaps="handled"
       contentContainerStyle={[
         styles.content,
         {

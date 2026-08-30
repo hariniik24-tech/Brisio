@@ -73,7 +73,19 @@ function isMissingDonationRecordsTableError(error) {
 }
 
 async function verifySupabaseSchema() {
-  const requiredTables = ['users', 'sessions', 'listings', 'engagements', 'engagement_messages', 'reports', 'blocks', 'password_reset_tokens'];
+  const requiredTables = [
+    'users',
+    'sessions',
+    'listings',
+    'engagements',
+    'engagement_messages',
+    'reports',
+    'blocks',
+    'password_reset_tokens',
+    'donation_records',
+    'donation_events',
+    'donation_handoffs',
+  ];
   for (const table of requiredTables) {
     const { error } = await supabase.from(table).select('*').limit(1);
     if (error) {

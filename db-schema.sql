@@ -141,6 +141,26 @@ CREATE TABLE IF NOT EXISTS donation_records (
   updatedAt TEXT NOT NULL
 );
 
+-- Compatibility columns used by the API alongside PostgreSQL-folded lowercase names.
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "donorOrgId" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "donorLocationId" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "recipientOrgId" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "productName" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "productBrand" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "productCategory" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "estimatedUnitValue" NUMERIC;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "estimatedTotalValue" NUMERIC;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "conditionNotes" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "expiresAt" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "pickupWindowStart" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "pickupWindowEnd" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "acceptedAt" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "declinedAt" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "receivedAt" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "createdByUserId" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "createdAt" TEXT;
+ALTER TABLE donation_records ADD COLUMN IF NOT EXISTS "updatedAt" TEXT;
+
 -- Create donation events table (append-only audit timeline)
 CREATE TABLE IF NOT EXISTS donation_events (
   id TEXT PRIMARY KEY,
@@ -153,6 +173,13 @@ CREATE TABLE IF NOT EXISTS donation_events (
   payloadJson TEXT NOT NULL DEFAULT '{}',
   createdAt TEXT NOT NULL
 );
+
+ALTER TABLE donation_events ADD COLUMN IF NOT EXISTS "donationId" TEXT;
+ALTER TABLE donation_events ADD COLUMN IF NOT EXISTS "eventType" TEXT;
+ALTER TABLE donation_events ADD COLUMN IF NOT EXISTS "actorUserId" TEXT;
+ALTER TABLE donation_events ADD COLUMN IF NOT EXISTS "actorRole" TEXT;
+ALTER TABLE donation_events ADD COLUMN IF NOT EXISTS "payloadJson" TEXT;
+ALTER TABLE donation_events ADD COLUMN IF NOT EXISTS "createdAt" TEXT;
 
 -- Create donation handoff table for one-time handoff token confirmation
 CREATE TABLE IF NOT EXISTS donation_handoffs (
@@ -169,6 +196,17 @@ CREATE TABLE IF NOT EXISTS donation_handoffs (
   createdAt TEXT NOT NULL
 );
 
+ALTER TABLE donation_handoffs ADD COLUMN IF NOT EXISTS "donationId" TEXT;
+ALTER TABLE donation_handoffs ADD COLUMN IF NOT EXISTS "handoffTokenHash" TEXT;
+ALTER TABLE donation_handoffs ADD COLUMN IF NOT EXISTS "tokenExpiresAt" TEXT;
+ALTER TABLE donation_handoffs ADD COLUMN IF NOT EXISTS "usedAt" TEXT;
+ALTER TABLE donation_handoffs ADD COLUMN IF NOT EXISTS "generatedByUserId" TEXT;
+ALTER TABLE donation_handoffs ADD COLUMN IF NOT EXISTS "receivedByUserId" TEXT;
+ALTER TABLE donation_handoffs ADD COLUMN IF NOT EXISTS "receivedQuantity" NUMERIC;
+ALTER TABLE donation_handoffs ADD COLUMN IF NOT EXISTS "receivedUnit" TEXT;
+ALTER TABLE donation_handoffs ADD COLUMN IF NOT EXISTS "receiptNote" TEXT;
+ALTER TABLE donation_handoffs ADD COLUMN IF NOT EXISTS "createdAt" TEXT;
+
 -- Donation indexes
 CREATE INDEX IF NOT EXISTS idx_donation_records_status ON donation_records(status);
 CREATE INDEX IF NOT EXISTS idx_donation_records_donorLocationId ON donation_records(donorLocationId);
@@ -176,3 +214,9 @@ CREATE INDEX IF NOT EXISTS idx_donation_records_recipientOrgId ON donation_recor
 CREATE INDEX IF NOT EXISTS idx_donation_records_createdAt ON donation_records(createdAt);
 CREATE INDEX IF NOT EXISTS idx_donation_events_donationId ON donation_events(donationId);
 CREATE INDEX IF NOT EXISTS idx_donation_handoffs_donationId ON donation_handoffs(donationId);
+CREATE INDEX IF NOT EXISTS idx_donation_records_donor_org_compat ON donation_records("donorOrgId");
+CREATE INDEX IF NOT EXISTS idx_donation_records_donor_location_compat ON donation_records("donorLocationId");
+CREATE INDEX IF NOT EXISTS idx_donation_records_recipient_compat ON donation_records("recipientOrgId");
+CREATE INDEX IF NOT EXISTS idx_donation_records_created_compat ON donation_records("createdAt");
+CREATE INDEX IF NOT EXISTS idx_donation_events_donation_compat ON donation_events("donationId");
+CREATE INDEX IF NOT EXISTS idx_donation_handoffs_donation_compat ON donation_handoffs("donationId");

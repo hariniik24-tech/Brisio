@@ -11,7 +11,7 @@
       "icon": "./assets/images/icon.png",
       "supportsTablet": true,
       "bundleIdentifier": "com.brisio.app",
-      "buildNumber": "41",
+      "buildNumber": "42",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

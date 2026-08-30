@@ -9,6 +9,8 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
 import { useTheme } from '@/hooks/use-theme';
 
+const INPUT_PLACEHOLDER_COLOR = '#6A7685';
+
 function ExploreContent() {
   const safeAreaInsets = useSafeAreaInsets();
   const session = useSessionContext();
@@ -153,11 +155,14 @@ function ExploreContent() {
         ) : (
           <>
             <ThemedView type="backgroundElement" style={styles.panel}>
+              <ThemedText type="smallBold">Search listings</ThemedText>
               <TextInput
-                style={styles.input}
-                placeholder="Search category, description, location"
+                style={[styles.input, { color: theme.text }]}
+                placeholder="Category, description, or location"
+                placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                 value={query}
                 onChangeText={setQuery}
+                accessibilityLabel="Search by category, description, or location"
               />
               <Pressable style={styles.refreshBtn} onPress={loadData}>
                 <ThemedText type="smallBold">Refresh</ThemedText>

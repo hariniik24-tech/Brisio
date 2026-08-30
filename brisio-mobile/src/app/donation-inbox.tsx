@@ -244,8 +244,13 @@ export default function DonationInboxScreen() {
 
   return (
     <StackScreenShell>
+      <Pressable style={styles.homeBtn} onPress={() => router.replace('/')}>
+        <ThemedText type="smallBold">Back to Home</ThemedText>
+      </Pressable>
       <ThemedText type="subtitle">Donation Inbox</ThemedText>
-      <ThemedText type="small">Review each offer, accept it, then scan the donor&apos;s QR code to confirm the handoff.</ThemedText>
+      <ThemedText type="small">
+        Review each offer and accept it. At pickup, the business displays a one-time QR code for your nonprofit to scan and confirm receipt.
+      </ThemedText>
 
       <View style={styles.metricsRow}>
         <View style={styles.metricCard}>
@@ -275,7 +280,10 @@ export default function DonationInboxScreen() {
         </View>
       ) : donations.length === 0 ? (
         <View style={styles.card}>
-          <ThemedText type="small">No donation records assigned yet.</ThemedText>
+          <ThemedText type="smallBold">No donations assigned yet</ThemedText>
+          <ThemedText type="small">
+            When a business sends your nonprofit a donation, it will appear here. The Scan QR button appears only after you accept that donation.
+          </ThemedText>
         </View>
       ) : (
         donations.map((donation) => {
@@ -359,6 +367,15 @@ export default function DonationInboxScreen() {
 }
 
 const styles = StyleSheet.create({
+  homeBtn: {
+    alignSelf: 'flex-start',
+    borderRadius: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderWidth: 1,
+    borderColor: '#CDD5E1',
+    backgroundColor: '#F7F9FC',
+  },
   metricsRow: {
     flexDirection: 'row',
     gap: Spacing.two,

@@ -2637,6 +2637,9 @@ app.get('/api/donations', async (req, res) => {
 
     const { data, error } = await query;
     if (error) {
+      if (isMissingDonationRecordsTableError(error)) {
+        return res.json({ success: true, donations: [] });
+      }
       return res.status(500).json({ success: false, error: explainSupabaseError(error) });
     }
 
@@ -2704,6 +2707,13 @@ app.get('/api/donations/export', async (req, res) => {
     }
     const { data, error } = await query;
     if (error) {
+      if (isMissingDonationRecordsTableError(error)) {
+        if (String(req.query.format || 'json').toLowerCase() === 'csv') {
+          res.type('text/csv');
+          return res.send('id,status,productName,quantity,unit,estimatedTotalValue,createdAt,recipientOrgId\n');
+        }
+        return res.json({ success: true, donations: [] });
+      }
       return res.status(500).json({ success: false, error: explainSupabaseError(error) });
     }
 

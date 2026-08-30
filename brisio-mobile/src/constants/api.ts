@@ -285,6 +285,13 @@ export async function createListing(
   });
 }
 
+export async function deleteListing(token: string, listingId: string) {
+  return apiRequest<{ success: true }>(`/api/listings/${encodeURIComponent(listingId)}`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
 export async function getEngagements(token: string) {
   return apiRequest<{ success: true; engagements: ApiEngagement[] }>('/api/engagements', { token });
 }

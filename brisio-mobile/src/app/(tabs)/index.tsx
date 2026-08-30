@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ApiListing, createListing, getDonationImpactSummary, getListings } from '@/constants/api';
+import { ApiListing, createListing, deleteListing, getDonationImpactSummary, getListings } from '@/constants/api';
 import { API_BASE_URL } from '@/constants/config';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
@@ -65,6 +65,7 @@ export default function HomeScreen() {
   const [form, setForm] = useState<ListingForm>(initialForm);
   const listingSubmittingRef = useRef(false);
   const [listingSubmitting, setListingSubmitting] = useState(false);
+  const [deletingListingId, setDeletingListingId] = useState('');
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
@@ -240,6 +241,32 @@ export default function HomeScreen() {
       listingSubmittingRef.current = false;
       setListingSubmitting(false);
     }
+  }
+
+  function confirmDeleteListing(listing: ApiListing) {
+    if (!session.token || listing.ownerUserId !== session.user?.id) return;
+
+    Alert.alert('Delete listing?', 'This listing will be permanently removed.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setDeletingListingId(listing.id);
+          setFormError('');
+          setFormSuccess('');
+          try {
+            await deleteListing(session.token!, listing.id);
+            setFormSuccess('Listing deleted.');
+            await Promise.all([loadListings(), loadStats()]);
+          } catch (err) {
+            setFormError(err instanceof Error ? err.message : 'Could not delete listing.');
+          } finally {
+            setDeletingListingId('');
+          }
+        },
+      },
+    ]);
   }
 
   async function runAiAssistant() {
@@ -467,6 +494,18 @@ export default function HomeScreen() {
                       </ThemedText>
                       <ThemedText type="small">{item.description}</ThemedText>
                       <ThemedText type="small">{item.location}</ThemedText>
+                      {item.ownerUserId === session.user?.id ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Delete ${item.category} listing`}
+                          style={[styles.deleteListingBtn, deletingListingId === item.id && styles.disabledBtn]}
+                          onPress={() => confirmDeleteListing(item)}
+                          disabled={Boolean(deletingListingId)}>
+                          <ThemedText type="smallBold" style={styles.deleteListingText}>
+                            {deletingListingId === item.id ? 'Deleting...' : 'Delete listing'}
+                          </ThemedText>
+                        </Pressable>
+                      ) : null}
                     </ThemedView>
                   ))
                 )}
@@ -532,20 +571,21 @@ export default function HomeScreen() {
             </>
           )}
 
-          <ThemedView type="backgroundElement" style={styles.panel}>
-            <ThemedText type="smallBold">Active community listings</ThemedText>
-            {statsLoading ? (
-              <ThemedView style={styles.loadingRow}>
-                <ActivityIndicator size="small" />
-                <ThemedText type="small">Loading community activity...</ThemedText>
-              </ThemedView>
-            ) : (
-              <ThemedText type="small">Current offers and needs across all Brisio accounts.</ThemedText>
-            )}
-            {!!statsError && <ThemedText style={styles.errorText}>{statsError}</ThemedText>}
-          </ThemedView>
+          {session.isAuthenticated ? <>
+            <ThemedView type="backgroundElement" style={styles.panel}>
+              <ThemedText type="smallBold">Active community listings</ThemedText>
+              {statsLoading ? (
+                <ThemedView style={styles.loadingRow}>
+                  <ActivityIndicator size="small" />
+                  <ThemedText type="small">Loading community activity...</ThemedText>
+                </ThemedView>
+              ) : (
+                <ThemedText type="small">Current offers and needs across all Brisio accounts.</ThemedText>
+              )}
+              {!!statsError && <ThemedText style={styles.errorText}>{statsError}</ThemedText>}
+            </ThemedView>
 
-          <ThemedView style={styles.statsGrid}>
+            <ThemedView style={styles.statsGrid}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="View business offers"
@@ -568,7 +608,8 @@ export default function HomeScreen() {
                 <ThemedText type="small" style={styles.helperText}>View in Explore</ThemedText>
               </ThemedView>
             </Pressable>
-          </ThemedView>
+            </ThemedView>
+          </> : null}
 
         </SafeAreaView>
       </ThemedView>
@@ -862,5 +903,12 @@ const styles = StyleSheet.create({
     padding: Spacing.two,
     gap: Spacing.one,
     backgroundColor: '#FBFCFE',
+  },
+  deleteListingBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: Spacing.one,
+  },
+  deleteListingText: {
+    color: '#A12A2A',
   },
 });

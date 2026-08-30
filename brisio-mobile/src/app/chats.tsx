@@ -21,9 +21,9 @@ import { ThemedView } from '@/components/themed-view';
 const INPUT_PLACEHOLDER_COLOR = '#6A7685';
 
 function getConversationLabel(engagement: ApiEngagement, userId?: string) {
-  const business = engagement.ownerOrganizationName || engagement.ownerDisplayName || 'Business';
-  const nonprofit = engagement.requesterOrganizationName || engagement.requesterDisplayName || 'Nonprofit';
-  return engagement.listingOwnerId === userId ? nonprofit : business;
+  const owner = engagement.ownerOrganizationName || engagement.ownerDisplayName || 'Listing owner';
+  const requester = engagement.requesterOrganizationName || engagement.requesterDisplayName || 'Requester';
+  return engagement.listingOwnerId === userId ? requester : owner;
 }
 
 function formatDate(value: string) {
@@ -155,7 +155,7 @@ export default function ChatsScreen() {
       setSelectedId(response.engagementId);
       await refreshChats();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start this chat.');
+      setError(err instanceof Error ? err.message : 'Could not send this request.');
     } finally {
       setStartingListingId('');
     }
@@ -199,7 +199,7 @@ export default function ChatsScreen() {
       <ThemedText type="subtitle">Chats</ThemedText>
 
       <ThemedView style={styles.startPanel}>
-        <ThemedText type="smallBold">Start a new chat</ThemedText>
+        <ThemedText type="smallBold">Send a new request</ThemedText>
         {chatOptions.length === 0 ? (
           <ThemedText style={styles.startEmptyText}>No new matching listings are available.</ThemedText>
         ) : (
@@ -211,12 +211,12 @@ export default function ChatsScreen() {
                 <ThemedText style={styles.statusText}>{listing.category} · {listing.location || 'Location not set'}</ThemedText>
               </View>
               <Pressable
-                accessibilityLabel={`Start chat with ${listing.businessName}`}
+                accessibilityLabel={`Send request to ${listing.businessName}`}
                 style={[styles.startBtn, startingListingId === listing.id && styles.disabledBtn]}
                 onPress={() => startChat(listing)}
                 disabled={Boolean(startingListingId)}>
                 <ThemedText style={styles.startBtnText}>
-                  {startingListingId === listing.id ? 'Starting...' : 'Start'}
+                  {startingListingId === listing.id ? 'Sending...' : 'Request'}
                 </ThemedText>
               </Pressable>
             </View>
@@ -232,7 +232,7 @@ export default function ChatsScreen() {
       ) : engagements.length === 0 ? (
         <ThemedView style={styles.emptyPanel}>
           <ThemedText type="small">No private conversations yet.</ThemedText>
-          <ThemedText type="small">Choose a listing from Start a new chat above.</ThemedText>
+          <ThemedText type="small">Send a request above. Messaging opens after the listing owner accepts.</ThemedText>
         </ThemedView>
       ) : (
         <>

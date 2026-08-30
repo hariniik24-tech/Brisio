@@ -1709,7 +1709,8 @@ app.delete('/api/listings/:id', async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Listing not found' });
     }
 
-    if (listing.ownerUserId !== req.user.id) {
+    const ownerUserId = String(listing.ownerUserId || listing.owneruserid || '');
+    if (ownerUserId !== req.user.id) {
       return res.status(403).json({ success: false, error: 'Only the owner can delete this listing' });
     }
 
@@ -1851,6 +1852,15 @@ app.patch('/api/engagements/:id/status', async (req, res, next) => {
 
     if (!canAccessEngagement(engagement, req.user)) {
       return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+
+    const listingOwnerId = getFirstDefined(engagement, ['listingOwnerId', 'listingownerid']);
+    const requesterUserId = getFirstDefined(engagement, ['requesterUserId', 'requesteruserid']);
+    if (['accepted', 'declined'].includes(status) && listingOwnerId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Only the listing owner can accept or decline this request' });
+    }
+    if (status === 'cancelled' && requesterUserId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Only the requester can cancel this request' });
     }
 
     const updatedAt = new Date().toISOString();

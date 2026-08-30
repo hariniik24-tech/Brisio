@@ -579,147 +579,129 @@ async function getBlockedUsersForUser(userId) {
 
 function canAccessEngagement(engagement, user) {
   if (!engagement || !user) return false;
-  return engagement.listingOwnerId === user.id || engagement.requesterUserId === user.id;
+  const listingOwnerId = getFirstDefined(engagement, ['listingOwnerId', 'listingownerid']);
+  const requesterUserId = getFirstDefined(engagement, ['requesterUserId', 'requesteruserid']);
+  return listingOwnerId === user.id || requesterUserId === user.id;
+}
+
+function normalizeEngagementRow(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    listingId: getFirstDefined(row, ['listingId', 'listingid']),
+    listingOwnerId: getFirstDefined(row, ['listingOwnerId', 'listingownerid']),
+    requesterUserId: getFirstDefined(row, ['requesterUserId', 'requesteruserid']),
+    createdAt: getFirstDefined(row, ['createdAt', 'createdat']),
+    updatedAt: getFirstDefined(row, ['updatedAt', 'updatedat']),
+  };
+}
+
+function flattenEngagement(engagement, listing, owner, requester, messages = []) {
+  return {
+    ...engagement,
+    businessName: getFirstDefined(listing, ['businessName', 'businessname']),
+    category: getFirstDefined(listing, ['category']),
+    type: getFirstDefined(listing, ['type']),
+    description: getFirstDefined(listing, ['description']),
+    contact: getFirstDefined(listing, ['contact']),
+    location: getFirstDefined(listing, ['location']),
+    deliverWithinHours: getFirstDefined(listing, ['deliverWithinHours', 'deliverwithinhours']),
+    offerClosesAt: getFirstDefined(listing, ['offerClosesAt', 'offerclosesat']),
+    urgencyLevel: getFirstDefined(listing, ['urgencyLevel', 'urgencylevel']),
+    isPrivate: getFirstDefined(listing, ['isPrivate', 'isprivate']),
+    resourceName: getFirstDefined(listing, ['resourceName', 'resourcename']),
+    resourceType: getFirstDefined(listing, ['resourceType', 'resourcetype']),
+    quantity: getFirstDefined(listing, ['quantity']),
+    availabilityNotes: getFirstDefined(listing, ['availabilityNotes', 'availabilitynotes']),
+    ownerDisplayName: owner?.displayName,
+    ownerOrganizationName: owner?.organizationName,
+    requesterDisplayName: requester?.displayName,
+    requesterOrganizationName: requester?.organizationName,
+    messages,
+  };
 }
 
 async function getEngagementById(id) {
-  const { data, error } = await supabase
+  const { data: row, error } = await supabase
     .from('engagements')
-    .select(`
-      *,
-      listings (
-        businessName,
-        category,
-        type,
-        description,
-        contact,
-        location,
-        deliverWithinHours,
-        offerClosesAt,
-        urgencyLevel,
-        isPrivate,
-        resourceName,
-        resourceType,
-        quantity,
-        availabilityNotes
-      ),
-      owner:users!listingOwnerId (
-        displayName,
-        organizationName
-      ),
-      requester:users!requesterUserId (
-        displayName,
-        organizationName
-      )
-    `)
+    .select('*')
     .eq('id', id)
     .single();
-  
-  if (error) return null;
-  
-  // Flatten the response
-  if (data && data.listings && data.listings[0]) {
-    const listing = data.listings[0];
-    return {
-      ...data,
-      businessName: listing.businessName,
-      category: listing.category,
-      type: listing.type,
-      description: listing.description,
-      contact: listing.contact,
-      location: listing.location,
-      deliverWithinHours: listing.deliverWithinHours,
-      offerClosesAt: listing.offerClosesAt,
-      urgencyLevel: listing.urgencyLevel,
-      isPrivate: listing.isPrivate,
-      resourceName: listing.resourceName,
-      resourceType: listing.resourceType,
-      quantity: listing.quantity,
-      availabilityNotes: listing.availabilityNotes,
-      ownerDisplayName: data.owner?.displayName,
-      ownerOrganizationName: data.owner?.organizationName,
-      requesterDisplayName: data.requester?.displayName,
-      requesterOrganizationName: data.requester?.organizationName
-    };
-  }
-  
-  return data;
+
+  if (error || !row) return null;
+
+  const engagement = normalizeEngagementRow(row);
+  const [{ data: listing }, { data: userRows }] = await Promise.all([
+    supabase.from('listings').select('*').eq('id', engagement.listingId).maybeSingle(),
+    supabase.from('users').select('*').in('id', [engagement.listingOwnerId, engagement.requesterUserId]),
+  ]);
+  const users = new Map((userRows || []).map((userRow) => {
+    const user = normalizeUserRow(userRow);
+    return [user.id, user];
+  }));
+
+  return flattenEngagement(
+    engagement,
+    listing,
+    users.get(engagement.listingOwnerId),
+    users.get(engagement.requesterUserId)
+  );
 }
 
 async function getEngagementMessages(engagementId) {
   const { data, error } = await supabase
     .from('engagement_messages')
-    .select('id, engagementId, senderUserId, senderName, body, etaNote, locationNote, createdAt')
+    .select('*')
     .eq('engagementId', engagementId)
     .order('createdAt', { ascending: true });
   
   if (error) return [];
-  return data || [];
+  return (data || []).map((row) => ({
+    ...row,
+    engagementId: getFirstDefined(row, ['engagementId', 'engagementid']),
+    senderUserId: getFirstDefined(row, ['senderUserId', 'senderuserid']),
+    senderName: getFirstDefined(row, ['senderName', 'sendername']),
+    etaNote: getFirstDefined(row, ['etaNote', 'etanote']),
+    locationNote: getFirstDefined(row, ['locationNote', 'locationnote']),
+    createdAt: getFirstDefined(row, ['createdAt', 'createdat']),
+  }));
 }
 
 async function getEngagementsForUser(user) {
   const { data, error } = await supabase
     .from('engagements')
-    .select(`
-      *,
-      listings (
-        businessName,
-        category,
-        type,
-        description,
-        contact,
-        location,
-        deliverWithinHours,
-        offerClosesAt,
-        urgencyLevel,
-        isPrivate,
-        resourceName,
-        resourceType,
-        quantity,
-        availabilityNotes
-      ),
-      owner:users!listingOwnerId (
-        displayName,
-        organizationName
-      ),
-      requester:users!requesterUserId (
-        displayName,
-        organizationName
-      )
-    `)
+    .select('*')
     .or(`listingOwnerId.eq.${user.id},requesterUserId.eq.${user.id}`)
     .order('updatedAt', { ascending: false });
   
-  if (error) return [];
+  if (error) throw error;
   
-  const rows = data || [];
+  const rows = (data || []).map(normalizeEngagementRow);
+  const listingIds = [...new Set(rows.map((row) => row.listingId).filter(Boolean))];
+  const userIds = [...new Set(rows.flatMap((row) => [row.listingOwnerId, row.requesterUserId]).filter(Boolean))];
+  const [{ data: listingRows, error: listingError }, { data: userRows, error: userError }] = await Promise.all([
+    listingIds.length ? supabase.from('listings').select('*').in('id', listingIds) : { data: [], error: null },
+    userIds.length ? supabase.from('users').select('*').in('id', userIds) : { data: [], error: null },
+  ]);
+  if (listingError) throw listingError;
+  if (userError) throw userError;
+
+  const listings = new Map((listingRows || []).map((listing) => [listing.id, listing]));
+  const users = new Map((userRows || []).map((userRow) => {
+    const normalizedUser = normalizeUserRow(userRow);
+    return [normalizedUser.id, normalizedUser];
+  }));
   const results = [];
   
   for (const row of rows) {
     const messages = await getEngagementMessages(row.id);
-    const listing = row.listings[0];
-    results.push({
-      ...row,
-      businessName: listing?.businessName,
-      category: listing?.category,
-      type: listing?.type,
-      description: listing?.description,
-      contact: listing?.contact,
-      location: listing?.location,
-      deliverWithinHours: listing?.deliverWithinHours,
-      offerClosesAt: listing?.offerClosesAt,
-      urgencyLevel: listing?.urgencyLevel,
-      isPrivate: listing?.isPrivate,
-      resourceName: listing?.resourceName,
-      resourceType: listing?.resourceType,
-      quantity: listing?.quantity,
-      availabilityNotes: listing?.availabilityNotes,
-      ownerDisplayName: row.owner?.displayName,
-      ownerOrganizationName: row.owner?.organizationName,
-      requesterDisplayName: row.requester?.displayName,
-      requesterOrganizationName: row.requester?.organizationName,
+    results.push(flattenEngagement(
+      row,
+      listings.get(row.listingId),
+      users.get(row.listingOwnerId),
+      users.get(row.requesterUserId),
       messages
-    });
+    ));
   }
   
   return results;

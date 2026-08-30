@@ -145,7 +145,9 @@ export default function ChatsScreen() {
         ) : engagements.length === 0 ? (
           <ThemedView style={styles.panel}>
             <ThemedText type="small">No private conversations yet.</ThemedText>
-            <ThemedText type="small">Open a listing on Home and tap Start private chat to begin.</ThemedText>
+            <ThemedText type="small">
+              Open Explore and tap Request this offer or Offer help on a listing to begin.
+            </ThemedText>
           </ThemedView>
         ) : (
           <>

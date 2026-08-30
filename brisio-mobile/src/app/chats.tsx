@@ -17,16 +17,23 @@ import { ThemedView } from '@/components/themed-view';
 
 const INPUT_PLACEHOLDER_COLOR = '#6A7685';
 
-function getConversationLabel(engagement: ApiEngagement) {
+function getConversationLabel(engagement: ApiEngagement, userId?: string) {
   const business = engagement.ownerOrganizationName || engagement.ownerDisplayName || 'Business';
   const nonprofit = engagement.requesterOrganizationName || engagement.requesterDisplayName || 'Nonprofit';
-  return `${business} and ${nonprofit}`;
+  return engagement.listingOwnerId === userId ? nonprofit : business;
 }
 
 function formatDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  const today = new Date();
+  return date.toDateString() === today.toDateString()
+    ? date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function formatStatus(status: ApiEngagement['status']) {
+  return status.replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase());
 }
 
 export default function ChatsScreen() {
@@ -144,121 +151,131 @@ export default function ChatsScreen() {
 
   return (
     <StackScreenShell footer={<View style={styles.tabClearance} />}>
-        <Pressable onPress={() => router.push('/')} style={styles.backBtn} hitSlop={10}>
-          <ThemedText type="smallBold">Back to Home</ThemedText>
-        </Pressable>
+      <Pressable onPress={() => router.push('/')} style={styles.backBtn} hitSlop={10}>
+        <ThemedText type="smallBold">Back to Home</ThemedText>
+      </Pressable>
 
-        <ThemedText type="subtitle">Private Business and Nonprofit Chats</ThemedText>
-        <ThemedText type="small">
-          Each conversation is private to the specific business and nonprofit connected to that listing.
-        </ThemedText>
+      <ThemedText type="subtitle">Chats</ThemedText>
 
-        {loading ? (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" />
-            <ThemedText type="small">Loading conversations...</ThemedText>
-          </View>
-        ) : engagements.length === 0 ? (
-          <ThemedView style={styles.panel}>
-            <ThemedText type="small">No private conversations yet.</ThemedText>
-            <ThemedText type="small">
-              Open Explore and tap Request this offer or Offer help on a listing to begin.
-            </ThemedText>
-          </ThemedView>
-        ) : (
-          <>
-            <ThemedView style={styles.panel}>
-              <ThemedText type="smallBold">Conversations</ThemedText>
-              <View style={styles.threadList}>
-                {engagements.map((item) => (
-                  <Pressable
-                    key={item.id}
-                    style={[styles.threadBtn, selectedId === item.id && styles.threadBtnActive]}
-                    onPress={() => setSelectedId(item.id)}>
-                    <ThemedText type="smallBold">{getConversationLabel(item)}</ThemedText>
-                    <ThemedText type="small">Status: {item.status}</ThemedText>
-                    <ThemedText type="small">{item.category || 'other'} | {item.location || 'no location'}</ThemedText>
-                  </Pressable>
-                ))}
-              </View>
-            </ThemedView>
-
-            {selected ? (
-              <ThemedView style={styles.panel}>
-                <ThemedText type="smallBold">{getConversationLabel(selected)}</ThemedText>
-                <ThemedText type="small">{selected.description || 'No listing description.'}</ThemedText>
-
-                {selected.status === 'requested' && selected.listingOwnerId === session.user?.id ? (
-                  <View style={styles.requestActions}>
-                    <ThemedText type="small">Accept the request to confirm that you can help.</ThemedText>
-                    <Pressable
-                      style={[styles.primaryBtn, statusBusy && styles.disabledBtn]}
-                      onPress={() => changeRequestStatus('accepted')}
-                      disabled={statusBusy}>
-                      <ThemedText type="smallBold">{statusBusy ? 'Updating...' : 'Accept request'}</ThemedText>
-                    </Pressable>
-                    <Pressable
-                      style={[styles.linkBtn, statusBusy && styles.disabledBtn]}
-                      onPress={() => changeRequestStatus('declined')}
-                      disabled={statusBusy}>
-                      <ThemedText type="smallBold">Decline request</ThemedText>
-                    </Pressable>
+      {loading ? (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator size="small" />
+          <ThemedText type="small">Loading conversations...</ThemedText>
+        </View>
+      ) : engagements.length === 0 ? (
+        <ThemedView style={styles.emptyPanel}>
+          <ThemedText type="small">No private conversations yet.</ThemedText>
+          <ThemedText type="small">Open Explore and request an offer or offer help to begin.</ThemedText>
+        </ThemedView>
+      ) : (
+        <>
+          <ThemedView style={styles.threadPanel}>
+            <View style={styles.threadList}>
+              {engagements.map((item) => (
+                <Pressable
+                  key={item.id}
+                  style={[styles.threadBtn, selectedId === item.id && styles.threadBtnActive]}
+                  onPress={() => setSelectedId(item.id)}>
+                  <View style={styles.threadHeading}>
+                    <ThemedText type="smallBold">{getConversationLabel(item, session.user?.id)}</ThemedText>
+                    <ThemedText style={styles.threadTime}>{formatDate(item.updatedAt || item.createdAt)}</ThemedText>
                   </View>
-                ) : null}
+                  <ThemedText style={styles.threadPreview} numberOfLines={1}>
+                    {(item.messages || []).at(-1)?.body || item.description || 'Listing conversation'}
+                  </ThemedText>
+                  <ThemedText style={styles.statusText}>{formatStatus(item.status)}</ThemedText>
+                </Pressable>
+              ))}
+            </View>
+          </ThemedView>
 
-                {selected.status === 'requested' && selected.requesterUserId === session.user?.id ? (
-                  <ThemedText type="small">Request sent. Waiting for the listing owner to respond.</ThemedText>
-                ) : null}
+          {selected ? (
+            <ThemedView style={styles.chatPanel}>
+              <View style={styles.chatHeader}>
+                <View style={styles.avatar}>
+                  <ThemedText style={styles.avatarText}>
+                    {getConversationLabel(selected, session.user?.id).slice(0, 1).toUpperCase()}
+                  </ThemedText>
+                </View>
+                <ThemedText type="smallBold">{getConversationLabel(selected, session.user?.id)}</ThemedText>
+                <ThemedText style={styles.listingSummary} numberOfLines={1}>
+                  {selected.description || 'Listing conversation'}
+                </ThemedText>
+              </View>
 
-                {selected.status === 'accepted' ? (
-                  <ThemedText type="small">Request accepted. Use this private chat to coordinate pickup or delivery.</ThemedText>
-                ) : null}
+              {selected.status === 'requested' && selected.listingOwnerId === session.user?.id ? (
+                <View style={styles.requestActions}>
+                  <ThemedText type="small">Accept the request to open messaging.</ThemedText>
+                  <Pressable
+                    style={[styles.primaryBtn, statusBusy && styles.disabledBtn]}
+                    onPress={() => changeRequestStatus('accepted')}
+                    disabled={statusBusy}>
+                    <ThemedText type="smallBold">{statusBusy ? 'Updating...' : 'Accept request'}</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.linkBtn, statusBusy && styles.disabledBtn]}
+                    onPress={() => changeRequestStatus('declined')}
+                    disabled={statusBusy}>
+                    <ThemedText type="smallBold">Decline request</ThemedText>
+                  </Pressable>
+                </View>
+              ) : null}
 
-                {selected.status === 'accepted' ? (
-                  <>
-                    <View style={styles.messageList}>
-                      {(selected.messages || []).length === 0 ? (
-                        <ThemedText type="small">No messages yet. Send the first message to coordinate timing.</ThemedText>
-                      ) : (
-                        selected.messages.map((message) => {
-                          const mine = message.senderUserId === session.user?.id;
-                          return (
-                            <ThemedView
-                              key={message.id}
-                              style={[styles.messageBubble, mine ? styles.myMessageBubble : styles.otherMessageBubble]}>
-                              <ThemedText type="smallBold">{mine ? 'You' : message.senderName}</ThemedText>
-                              <ThemedText type="small">{message.body}</ThemedText>
-                              <ThemedText type="small">{formatDate(message.createdAt)}</ThemedText>
-                            </ThemedView>
-                          );
-                        })
-                      )}
-                    </View>
+              {selected.status === 'requested' && selected.requesterUserId === session.user?.id ? (
+                <ThemedText style={styles.waitingText}>Waiting for the listing owner to accept.</ThemedText>
+              ) : null}
 
+              {selected.status === 'accepted' ? (
+                <>
+                  <ThemedText style={styles.acceptedText}>Request accepted</ThemedText>
+                  <View style={styles.messageList}>
+                    {(selected.messages || []).length === 0 ? (
+                      <ThemedText style={styles.noMessagesText}>No messages yet</ThemedText>
+                    ) : (
+                      selected.messages.map((message) => {
+                        const mine = message.senderUserId === session.user?.id;
+                        return (
+                          <View key={message.id} style={[styles.messageRow, mine ? styles.myMessageRow : styles.otherMessageRow]}>
+                            {!mine ? <ThemedText style={styles.senderName}>{message.senderName}</ThemedText> : null}
+                            <View style={[styles.messageBubble, mine ? styles.myMessageBubble : styles.otherMessageBubble]}>
+                              <ThemedText style={mine ? styles.myMessageText : styles.otherMessageText}>
+                                {message.body}
+                              </ThemedText>
+                            </View>
+                            <ThemedText style={styles.messageTime}>{formatDate(message.createdAt)}</ThemedText>
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
+
+                  <View style={styles.composerRow}>
                     <TextInput
                       style={styles.input}
-                      placeholder="Message about delivery time or pickup details"
+                      placeholder="Message"
                       placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                       multiline
                       value={draft}
                       onChangeText={setDraft}
                     />
                     <Pressable
-                      style={[styles.primaryBtn, sending && styles.disabledBtn]}
+                      accessibilityLabel="Send message"
+                      style={[styles.sendBtn, (!draft.trim() || sending) && styles.sendBtnDisabled]}
                       onPress={sendMessage}
-                      disabled={sending}>
-                      <ThemedText type="smallBold">{sending ? 'Sending...' : 'Send private message'}</ThemedText>
+                      disabled={!draft.trim() || sending}>
+                      <ThemedText style={styles.sendIcon}>↑</ThemedText>
                     </Pressable>
-                  </>
-                ) : (
-                  <ThemedText type="small">Messaging opens after the listing owner accepts this request.</ThemedText>
-                )}
-              </ThemedView>
-            ) : null}
-          </>
-        )}
+                  </View>
+                </>
+              ) : selected.status !== 'requested' ? (
+                <ThemedText style={styles.waitingText}>Messaging is unavailable for this request.</ThemedText>
+              ) : null}
+            </ThemedView>
+          ) : null}
+        </>
+      )}
 
-        {!!error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
+      {!!error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
     </StackScreenShell>
   );
 }
@@ -275,62 +292,194 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
   },
-  panel: {
+  emptyPanel: {
     borderWidth: 1,
     borderColor: '#DCE4EE',
-    borderRadius: Spacing.four,
+    borderRadius: Spacing.three,
     padding: Spacing.three,
     gap: Spacing.two,
     backgroundColor: '#FAFCFF',
   },
+  threadPanel: {
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#DCE4EE',
+    borderRadius: Spacing.three,
+    backgroundColor: '#FFFFFF',
+  },
   threadList: {
-    gap: Spacing.two,
+    gap: 0,
   },
   threadBtn: {
-    borderWidth: 1,
-    borderColor: '#CDD5E1',
-    borderRadius: Spacing.three,
-    padding: Spacing.two,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E1E6ED',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 12,
     gap: Spacing.one,
     backgroundColor: '#FFFFFF',
   },
   threadBtnActive: {
-    borderColor: '#95AECF',
     backgroundColor: '#EEF5FD',
   },
-  messageList: {
+  threadHeading: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     gap: Spacing.two,
   },
+  threadTime: {
+    color: '#7A8797',
+    fontSize: 12,
+  },
+  threadPreview: {
+    color: '#5A687A',
+    fontSize: 14,
+  },
+  statusText: {
+    color: '#476C9D',
+    fontSize: 12,
+  },
+  chatPanel: {
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#DCE4EE',
+    borderRadius: Spacing.three,
+    backgroundColor: '#FFFFFF',
+  },
+  chatHeader: {
+    alignItems: 'center',
+    padding: Spacing.three,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E4E9F0',
+    gap: Spacing.one,
+  },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DCEBFA',
+  },
+  avatarText: {
+    color: '#315E91',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  listingSummary: {
+    maxWidth: '90%',
+    color: '#6A7685',
+    fontSize: 12,
+  },
+  acceptedText: {
+    alignSelf: 'center',
+    color: '#46705A',
+    fontSize: 12,
+    paddingTop: Spacing.two,
+  },
+  waitingText: {
+    padding: Spacing.three,
+    color: '#5A687A',
+    textAlign: 'center',
+  },
+  noMessagesText: {
+    color: '#7A8797',
+    textAlign: 'center',
+    paddingVertical: Spacing.four,
+  },
+  messageList: {
+    gap: 10,
+    padding: Spacing.three,
+    backgroundColor: '#F8FAFD',
+  },
   requestActions: {
+    padding: Spacing.three,
     gap: Spacing.two,
   },
   disabledBtn: {
     opacity: 0.6,
   },
+  messageRow: {
+    width: '100%',
+    gap: 3,
+  },
+  myMessageRow: {
+    alignItems: 'flex-end',
+  },
+  otherMessageRow: {
+    alignItems: 'flex-start',
+  },
   messageBubble: {
-    borderWidth: 1,
-    borderRadius: Spacing.three,
-    padding: Spacing.two,
-    gap: Spacing.one,
+    maxWidth: '82%',
+    borderRadius: 18,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
   },
   myMessageBubble: {
-    borderColor: '#A9C3E4',
-    backgroundColor: '#EAF3FF',
+    borderBottomRightRadius: 5,
+    backgroundColor: '#3478C9',
   },
   otherMessageBubble: {
-    borderColor: '#D5DDE8',
+    borderBottomLeftRadius: 5,
+    backgroundColor: '#E7EBF0',
+  },
+  myMessageText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    lineHeight: 21,
+  },
+  otherMessageText: {
+    color: '#172538',
+    fontSize: 16,
+    lineHeight: 21,
+  },
+  senderName: {
+    marginLeft: Spacing.two,
+    color: '#6A7685',
+    fontSize: 11,
+  },
+  messageTime: {
+    marginHorizontal: Spacing.two,
+    color: '#8894A3',
+    fontSize: 10,
+  },
+  composerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: Spacing.two,
+    padding: Spacing.two,
+    borderTopWidth: 1,
+    borderTopColor: '#E4E9F0',
     backgroundColor: '#FFFFFF',
   },
   input: {
+    flex: 1,
     borderWidth: 1,
     borderColor: '#C3CDDB',
-    borderRadius: Spacing.three,
+    borderRadius: 20,
     paddingHorizontal: Spacing.three,
-    paddingVertical: 10,
-    minHeight: 84,
+    paddingVertical: 8,
+    minHeight: 40,
+    maxHeight: 112,
     textAlignVertical: 'top',
     backgroundColor: '#FFFFFF',
     color: '#1C2735',
+  },
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#3478C9',
+  },
+  sendBtnDisabled: {
+    backgroundColor: '#B8C2CE',
+  },
+  sendIcon: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    lineHeight: 27,
+    fontWeight: '700',
   },
   primaryBtn: {
     alignItems: 'center',

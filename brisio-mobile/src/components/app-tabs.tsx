@@ -36,9 +36,9 @@ export default function AppTabs() {
           sf={{ default: 'message', selected: 'message.fill' }}
           md={{ default: 'chat_bubble_outline', selected: 'chat_bubble' }}
         />
-        <NativeTabs.Trigger.Badge hidden={unreadCount === 0}>
-          {unreadCount > 99 ? '99+' : String(unreadCount)}
-        </NativeTabs.Trigger.Badge>
+        {unreadCount > 0 ? (
+          <NativeTabs.Trigger.Badge>{unreadCount > 99 ? '99+' : String(unreadCount)}</NativeTabs.Trigger.Badge>
+        ) : null}
       </NativeTabs.Trigger>
     </NativeTabs>
   );

@@ -142,7 +142,7 @@ function ExploreContent() {
         <ThemedView style={styles.titleContainer}>
           <ThemedText type="subtitle">Explore Listings</ThemedText>
           <ThemedText style={styles.centerText} themeColor="textSecondary">
-            Browse live listings from your Brisio backend.
+            Browse active offers and needs posted by the Brisio community.
           </ThemedText>
         </ThemedView>
 
@@ -181,7 +181,7 @@ function ExploreContent() {
                   <ThemedView key={item.id} type="backgroundElement" style={styles.listingCard}>
                     <ThemedText type="smallBold">{item.businessName}</ThemedText>
                     <ThemedText type="small">
-                      {item.type} | {item.category}
+                      {item.type === 'supply' ? 'Business offer' : 'Nonprofit need'} | {item.category}
                     </ThemedText>
                     <ThemedText type="small">{item.description}</ThemedText>
                     <ThemedText type="small">{item.location || 'Location not set'}</ThemedText>

@@ -14,10 +14,8 @@ const INPUT_PLACEHOLDER_COLOR = '#6A7685';
 const DONATION_SUMMARY_FALLBACK_MESSAGE = 'Donation metrics are temporarily unavailable. Please refresh shortly.';
 
 type Stats = {
-  total: number;
   supply: number;
   demand: number;
-  reports: number;
 };
 
 type DonationSummary = {
@@ -35,7 +33,7 @@ type ListingForm = {
   deliverWithinHours: string;
 };
 
-const emptyStats: Stats = { total: 0, supply: 0, demand: 0, reports: 0 };
+const emptyStats: Stats = { supply: 0, demand: 0 };
 const emptyDonationSummary: DonationSummary = {
   itemsDonated: 0,
   estimatedInventoryValue: 0,
@@ -86,10 +84,8 @@ export default function HomeScreen() {
         throw new Error('Could not load stats');
       }
       setStats({
-        total: payload.stats.total || 0,
         supply: payload.stats.supply || 0,
         demand: payload.stats.demand || 0,
-        reports: payload.stats.reports || 0,
       });
     } catch {
       setStatsError('Unable to reach backend stats. Update apiBaseUrl in app.json for device testing.');
@@ -140,10 +136,8 @@ export default function HomeScreen() {
         }
         if (!isActive) return;
         setStats({
-          total: payload.stats.total || 0,
           supply: payload.stats.supply || 0,
           demand: payload.stats.demand || 0,
-          reports: payload.stats.reports || 0,
         });
       } catch {
         if (!isActive) return;
@@ -559,35 +553,41 @@ export default function HomeScreen() {
           )}
 
           <ThemedView type="backgroundElement" style={styles.panel}>
-            <ThemedText type="smallBold">Platform stats</ThemedText>
+            <ThemedText type="smallBold">Active community listings</ThemedText>
             {statsLoading ? (
               <ThemedView style={styles.loadingRow}>
                 <ActivityIndicator size="small" />
-                <ThemedText type="small">Loading live stats...</ThemedText>
+                <ThemedText type="small">Loading community activity...</ThemedText>
               </ThemedView>
             ) : (
-              <ThemedText type="small">Connected stats shown below.</ThemedText>
+              <ThemedText type="small">Current offers and needs across all Brisio accounts.</ThemedText>
             )}
             {!!statsError && <ThemedText style={styles.errorText}>{statsError}</ThemedText>}
           </ThemedView>
 
           <ThemedView style={styles.statsGrid}>
-            <ThemedView type="backgroundElement" style={styles.statTile}>
-              <ThemedText type="small">Listings</ThemedText>
-              <ThemedText type="subtitle">{stats.total}</ThemedText>
-            </ThemedView>
-            <ThemedView type="backgroundElement" style={styles.statTile}>
-              <ThemedText type="small">Supply</ThemedText>
-              <ThemedText type="subtitle">{stats.supply}</ThemedText>
-            </ThemedView>
-            <ThemedView type="backgroundElement" style={styles.statTile}>
-              <ThemedText type="small">Demand</ThemedText>
-              <ThemedText type="subtitle">{stats.demand}</ThemedText>
-            </ThemedView>
-            <ThemedView type="backgroundElement" style={styles.statTile}>
-              <ThemedText type="small">Reports</ThemedText>
-              <ThemedText type="subtitle">{stats.reports}</ThemedText>
-            </ThemedView>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="View business offers"
+              style={styles.statTileLink}
+              onPress={() => router.push('/explore')}>
+              <ThemedView type="backgroundElement" style={styles.statTile}>
+                <ThemedText type="small">Business offers</ThemedText>
+                <ThemedText type="subtitle">{stats.supply}</ThemedText>
+                <ThemedText type="small" style={styles.helperText}>View in Explore</ThemedText>
+              </ThemedView>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="View nonprofit needs"
+              style={styles.statTileLink}
+              onPress={() => router.push('/explore')}>
+              <ThemedView type="backgroundElement" style={styles.statTile}>
+                <ThemedText type="small">Nonprofit needs</ThemedText>
+                <ThemedText type="subtitle">{stats.demand}</ThemedText>
+                <ThemedText type="small" style={styles.helperText}>View in Explore</ThemedText>
+              </ThemedView>
+            </Pressable>
           </ThemedView>
 
         </SafeAreaView>
@@ -860,14 +860,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7FBFF',
   },
   statTile: {
-    width: '48%',
-    minWidth: 140,
+    width: '100%',
     borderRadius: Spacing.four,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     gap: Spacing.one,
     borderWidth: 1,
     borderColor: '#DCE4EE',
+  },
+  statTileLink: {
+    width: '48%',
+    minWidth: 140,
   },
   listingItem: {
     borderWidth: 1,

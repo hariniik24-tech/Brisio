@@ -1953,23 +1953,22 @@ app.get('/api/stats', async (req, res) => {
     const { data: listings } = await supabase.from('listings').select('type, urgent, active');
     const { data: users } = await supabase.from('users').select('role');
     const { data: engagements } = await supabase.from('engagements').select('status');
-    const { data: reports } = await supabase.from('reports').select('id');
+    const activeListings = listings?.filter(l => l.active === 1) || [];
 
     const stats = {
       totalListings: listings?.length || 0,
-      activeListings: listings?.filter(l => l.active === 1).length || 0,
-      supplyListings: listings?.filter(l => l.type === 'supply').length || 0,
-      demandListings: listings?.filter(l => l.type === 'demand').length || 0,
+      activeListings: activeListings.length,
+      supplyListings: activeListings.filter(l => l.type === 'supply').length,
+      demandListings: activeListings.filter(l => l.type === 'demand').length,
       urgentListings: listings?.filter(l => l.urgent === 1).length || 0,
       totalUsers: users?.length || 0,
       businessUsers: users?.filter(u => u.role === 'business').length || 0,
       organizationUsers: users?.filter(u => u.role === 'organization').length || 0,
       totalEngagements: engagements?.length || 0,
       completedEngagements: engagements?.filter(e => e.status === 'completed').length || 0,
-      total: listings?.filter(l => l.active === 1).length || 0,
-      supply: listings?.filter(l => l.type === 'supply').length || 0,
-      demand: listings?.filter(l => l.type === 'demand').length || 0,
-      reports: reports?.length || 0
+      total: activeListings.length,
+      supply: activeListings.filter(l => l.type === 'supply').length,
+      demand: activeListings.filter(l => l.type === 'demand').length
     };
 
     res.json({ success: true, stats });

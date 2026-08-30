@@ -1894,6 +1894,10 @@ app.post('/api/engagements/:id/messages', async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'Access denied' });
     }
 
+    if (engagement.status !== 'accepted') {
+      return res.status(409).json({ success: false, error: 'Messages are available after the request is accepted' });
+    }
+
     const messageId = crypto.randomUUID();
     const now = new Date().toISOString();
 

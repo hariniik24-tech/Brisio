@@ -214,39 +214,45 @@ export default function ChatsScreen() {
                   <ThemedText type="small">Request accepted. Use this private chat to coordinate pickup or delivery.</ThemedText>
                 ) : null}
 
-                <View style={styles.messageList}>
-                  {(selected.messages || []).length === 0 ? (
-                    <ThemedText type="small">No messages yet. Send the first message to coordinate timing.</ThemedText>
-                  ) : (
-                    selected.messages.map((message) => {
-                      const mine = message.senderUserId === session.user?.id;
-                      return (
-                        <ThemedView
-                          key={message.id}
-                          style={[styles.messageBubble, mine ? styles.myMessageBubble : styles.otherMessageBubble]}>
-                          <ThemedText type="smallBold">{mine ? 'You' : message.senderName}</ThemedText>
-                          <ThemedText type="small">{message.body}</ThemedText>
-                          <ThemedText type="small">{formatDate(message.createdAt)}</ThemedText>
-                        </ThemedView>
-                      );
-                    })
-                  )}
-                </View>
+                {selected.status === 'accepted' ? (
+                  <>
+                    <View style={styles.messageList}>
+                      {(selected.messages || []).length === 0 ? (
+                        <ThemedText type="small">No messages yet. Send the first message to coordinate timing.</ThemedText>
+                      ) : (
+                        selected.messages.map((message) => {
+                          const mine = message.senderUserId === session.user?.id;
+                          return (
+                            <ThemedView
+                              key={message.id}
+                              style={[styles.messageBubble, mine ? styles.myMessageBubble : styles.otherMessageBubble]}>
+                              <ThemedText type="smallBold">{mine ? 'You' : message.senderName}</ThemedText>
+                              <ThemedText type="small">{message.body}</ThemedText>
+                              <ThemedText type="small">{formatDate(message.createdAt)}</ThemedText>
+                            </ThemedView>
+                          );
+                        })
+                      )}
+                    </View>
 
-                <TextInput
-                  style={styles.input}
-                  placeholder="Message about delivery time or pickup details"
-                  placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-                  multiline
-                  value={draft}
-                  onChangeText={setDraft}
-                />
-                <Pressable
-                  style={[styles.primaryBtn, sending && styles.disabledBtn]}
-                  onPress={sendMessage}
-                  disabled={sending}>
-                  <ThemedText type="smallBold">{sending ? 'Sending...' : 'Send private message'}</ThemedText>
-                </Pressable>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Message about delivery time or pickup details"
+                      placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+                      multiline
+                      value={draft}
+                      onChangeText={setDraft}
+                    />
+                    <Pressable
+                      style={[styles.primaryBtn, sending && styles.disabledBtn]}
+                      onPress={sendMessage}
+                      disabled={sending}>
+                      <ThemedText type="smallBold">{sending ? 'Sending...' : 'Send private message'}</ThemedText>
+                    </Pressable>
+                  </>
+                ) : (
+                  <ThemedText type="small">Messaging opens after the listing owner accepts this request.</ThemedText>
+                )}
               </ThemedView>
             ) : null}
           </>

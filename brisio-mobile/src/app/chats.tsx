@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { Link, useLocalSearchParams, useRouter } from 'expo-router';
+import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   ApiEngagement,
@@ -8,7 +8,8 @@ import {
   sendEngagementMessage,
   updateEngagementStatus,
 } from '@/constants/api';
-import { Spacing } from '@/constants/theme';
+import { BottomTabInset, Spacing } from '@/constants/theme';
+import { useChatNotifications } from '@/context/chat-notifications-context';
 import { useSessionContext } from '@/context/session-context';
 import { StackScreenShell } from '@/components/stack-screen-shell';
 import { ThemedText } from '@/components/themed-text';
@@ -32,6 +33,7 @@ export default function ChatsScreen() {
   const { engagementId } = useLocalSearchParams<{ engagementId?: string }>();
   const router = useRouter();
   const session = useSessionContext();
+  const { markChatsRead, refreshChats } = useChatNotifications();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -46,9 +48,9 @@ export default function ChatsScreen() {
     [engagements, selectedId]
   );
 
-  async function loadConversations() {
-    if (!session.token) return;
-    setLoading(true);
+  const loadConversations = useCallback(async (showLoading = true) => {
+    if (!session.token) return false;
+    if (showLoading) setLoading(true);
     setError('');
     try {
       const response = await getEngagements(session.token);
@@ -56,29 +58,41 @@ export default function ChatsScreen() {
       setEngagements(rows);
 
       const requestedId = typeof engagementId === 'string' ? engagementId : '';
-      if (requestedId && rows.some((item) => item.id === requestedId)) {
-        setSelectedId(requestedId);
-      } else if (!selectedId && rows.length > 0) {
-        setSelectedId(rows[0].id);
-      } else if (selectedId && !rows.some((item) => item.id === selectedId)) {
-        setSelectedId(rows[0]?.id || '');
-      }
+      setSelectedId((currentId) => {
+        if (requestedId && rows.some((item) => item.id === requestedId)) return requestedId;
+        if (!currentId && rows.length > 0) return rows[0].id;
+        if (currentId && !rows.some((item) => item.id === currentId)) return rows[0]?.id || '';
+        return currentId;
+      });
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load private chats.');
       setEngagements([]);
       setSelectedId('');
+      return false;
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
-  }
+  }, [engagementId, session.token]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      loadConversations();
-    }, 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.token, engagementId]);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const refreshVisibleChats = async (showLoading = false) => {
+        const loaded = await loadConversations(showLoading);
+        if (!active || !loaded) return;
+        await refreshChats();
+        await markChatsRead();
+      };
+
+      refreshVisibleChats(true);
+      const interval = setInterval(refreshVisibleChats, 5_000);
+      return () => {
+        active = false;
+        clearInterval(interval);
+      };
+    }, [loadConversations, markChatsRead, refreshChats])
+  );
 
   async function sendMessage() {
     if (!session.token || !selected) return;
@@ -90,7 +104,8 @@ export default function ChatsScreen() {
     try {
       await sendEngagementMessage(session.token, selected.id, { body });
       setDraft('');
-      await loadConversations();
+      await loadConversations(false);
+      await refreshChats();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send message.');
     } finally {
@@ -104,7 +119,8 @@ export default function ChatsScreen() {
     setError('');
     try {
       await updateEngagementStatus(session.token, selected.id, status);
-      await loadConversations();
+      await loadConversations(false);
+      await refreshChats();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not update this request.');
     } finally {
@@ -114,7 +130,7 @@ export default function ChatsScreen() {
 
   if (!session.isAuthenticated) {
     return (
-      <StackScreenShell>
+      <StackScreenShell footer={<View style={styles.tabClearance} />}>
           <ThemedText type="subtitle">Private Chats</ThemedText>
           <ThemedText type="small">Sign in to access your business and nonprofit conversations.</ThemedText>
           <Link href="/" asChild>
@@ -127,7 +143,7 @@ export default function ChatsScreen() {
   }
 
   return (
-    <StackScreenShell>
+    <StackScreenShell footer={<View style={styles.tabClearance} />}>
         <Pressable onPress={() => router.push('/')} style={styles.backBtn} hitSlop={10}>
           <ThemedText type="smallBold">Back to Home</ThemedText>
         </Pressable>
@@ -225,7 +241,10 @@ export default function ChatsScreen() {
                   value={draft}
                   onChangeText={setDraft}
                 />
-                <Pressable style={styles.primaryBtn} onPress={sendMessage}>
+                <Pressable
+                  style={[styles.primaryBtn, sending && styles.disabledBtn]}
+                  onPress={sendMessage}
+                  disabled={sending}>
                   <ThemedText type="smallBold">{sending ? 'Sending...' : 'Send private message'}</ThemedText>
                 </Pressable>
               </ThemedView>
@@ -239,6 +258,9 @@ export default function ChatsScreen() {
 }
 
 const styles = StyleSheet.create({
+  tabClearance: {
+    height: BottomTabInset,
+  },
   backBtn: {
     alignSelf: 'flex-start',
   },

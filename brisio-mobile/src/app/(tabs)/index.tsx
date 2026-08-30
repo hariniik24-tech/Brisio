@@ -288,7 +288,7 @@ export default function HomeScreen() {
       const response = await requestListingEngagement(session.token, listingId);
       setFormSuccess('Private chat request sent. Opening conversation...');
       router.push({
-        pathname: '/chats',
+        pathname: '/messages',
         params: { engagementId: response.engagementId },
       });
     } catch (err) {
@@ -363,7 +363,7 @@ export default function HomeScreen() {
                       : 'Focus on posting available resources and coordinating delivery quickly.'}
                   </ThemedText>
                 </ThemedView>
-                <Link href="/chats" asChild>
+                <Link href="/messages" asChild>
                   <Pressable style={styles.primaryBtn}>
                     <ThemedText type="smallBold">Open private chats</ThemedText>
                   </Pressable>

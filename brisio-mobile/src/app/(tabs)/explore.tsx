@@ -66,7 +66,7 @@ function ExploreContent() {
     try {
       const response = await requestListingEngagement(session.token, item.id);
       router.push({
-        pathname: '/chats',
+        pathname: '/messages',
         params: { engagementId: response.engagementId },
       });
     } catch (err) {

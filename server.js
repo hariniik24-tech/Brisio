@@ -61,6 +61,9 @@ let resetMailer = null;
 
 function explainSupabaseError(error) {
   const message = String(error?.message || error || 'Unknown Supabase error');
+  if (/fetch failed|network request failed|getaddrinfo|enotfound/i.test(message)) {
+    return 'Database service is temporarily unavailable. Please try again shortly.';
+  }
   if (message.includes("Could not find the table 'public.users' in the schema cache")) {
     return 'Supabase schema is incomplete for this project. Run db-schema.sql in Supabase SQL Editor, then retry.';
   }
@@ -1956,6 +1959,10 @@ app.get('/api/match/:query', async (req, res, next) => {
 });
 
 // Statistics Endpoints
+app.get('/api/health', (req, res) => {
+  res.json({ success: true });
+});
+
 app.get('/api/stats', async (req, res) => {
   try {
     const { data: listings } = await supabase.from('listings').select('type, urgent, active');

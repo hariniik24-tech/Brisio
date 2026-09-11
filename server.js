@@ -1485,7 +1485,7 @@ app.post('/api/auth/login', async (req, res) => {
       .from('users')
       .select('*')
       .eq('email', email)
-      .single();
+      .maybeSingle();
 
     const normalizedUser = normalizeUserRow(user);
     if (error || !normalizedUser || !verifyPassword(password, normalizedUser.passwordHash)) {

@@ -3050,10 +3050,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Brisio backend running on port ${PORT}`);
   console.log(`Using Supabase: ${supabaseUrl}`);
-  verifySupabaseSchema().catch((err) => {
-    console.error('Supabase schema check failed unexpectedly:', explainSupabaseError(err));
-  });
 });

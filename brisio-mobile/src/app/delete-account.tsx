@@ -55,7 +55,11 @@ export default function DeleteAccountScreen() {
           placeholder="DELETE ACCOUNT"
           autoCapitalize="characters"
         />
-        <Pressable style={styles.deleteBtn} onPress={handleDelete} hitSlop={12}>
+        <Pressable
+          style={[styles.deleteBtn, busy && styles.deleteBtnDisabled]}
+          onPress={handleDelete}
+          disabled={busy}
+          hitSlop={12}>
           {busy ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Delete my account</ThemedText>}
         </Pressable>
         {!!message && <ThemedText type="small">{message}</ThemedText>}
@@ -83,5 +87,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#CF807A',
     backgroundColor: '#F9E5E3',
+  },
+  deleteBtnDisabled: {
+    opacity: 0.45,
   },
 });

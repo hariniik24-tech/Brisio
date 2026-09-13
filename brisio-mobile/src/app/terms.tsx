@@ -42,7 +42,6 @@ When creating an account, you agree to provide information that is accurate, cur
 You may be required to provide information such as:
 - Name
 - Email address
-- Phone number
 - Organization or business name
 - Address
 - City
@@ -173,7 +172,7 @@ Your use of Brisio is also governed by the Brisio Privacy Policy.
 
 The Privacy Policy explains how Brisio collects, uses, stores, and shares personal information.
 
-You can access the Privacy Policy at: /privacy-policy
+You can access the Privacy Policy from the account registration screen and the app's legal links.
 
 13. Account Suspension and Termination
 You may stop using Brisio at any time.
@@ -251,9 +250,7 @@ If material changes are made, we may provide additional notice through Brisio or
 Your continued use of Brisio after updated Terms become effective constitutes acceptance of the updated Terms, subject to applicable law.
 
 21. Governing Law
-These Terms will be governed by the laws of [STATE], without regard to conflict-of-law principles, except where applicable law requires otherwise.
-
-Any dispute that cannot otherwise be resolved will be handled in the courts located in [COUNTY/STATE], unless applicable law requires a different venue.
+These Terms will be governed by applicable law, without regard to conflict-of-law principles, except where applicable law requires otherwise.
 
 22. Severability
 If any provision of these Terms is determined to be invalid or unenforceable, the remaining provisions will remain in effect to the fullest extent permitted by law.
@@ -266,8 +263,6 @@ If you have questions, concerns, reports, or requests regarding Brisio or these 
 
 Brisio
 Email: hariniik24@gmail.com
-Website: [BRISIO WEBSITE URL]
-
 For reports concerning abusive, fraudulent, or prohibited content, please include sufficient information for us to investigate the concern.
 
 Last Updated: August 11, 2026`;

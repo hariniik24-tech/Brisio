@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, Share, StyleSheet, Switch, TextInput, View } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
@@ -52,6 +52,7 @@ export default function DonationInboxScreen() {
   const [errorMessage, setErrorMessage] = useState('');
   const [donations, setDonations] = useState<ApiDonation[]>([]);
   const [tokenByDonationId, setTokenByDonationId] = useState<Record<string, string>>({});
+  const [certifiedByDonationId, setCertifiedByDonationId] = useState<Record<string, boolean>>({});
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [scannerDonationId, setScannerDonationId] = useState('');
   const [hasScanned, setHasScanned] = useState(false);
@@ -137,6 +138,10 @@ export default function DonationInboxScreen() {
       setErrorMessage('Enter the one-time handoff token from the donor.');
       return;
     }
+    if (!certifiedByDonationId[donationId]) {
+      setErrorMessage('Confirm the recipient statement before completing the handoff.');
+      return;
+    }
 
     setBusyId(donationId);
     setStatusMessage('');
@@ -148,10 +153,12 @@ export default function DonationInboxScreen() {
         handoffToken: token,
         receivedQuantity: quantity,
         receivedUnit: unit,
+        foodUseCertified: true,
       });
-      setStatusMessage('Pickup confirmed and recorded as received.');
+      setStatusMessage('Pickup confirmed. The donation acknowledgment is ready.');
       setTokenByDonationId((prev) => ({ ...prev, [donationId]: '' }));
-      await loadDonations();
+      setCertifiedByDonationId((prev) => ({ ...prev, [donationId]: false }));
+      router.push({ pathname: '/donation-acknowledgment', params: { donationId } });
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Could not confirm handoff.');
     } finally {
@@ -350,13 +357,36 @@ export default function DonationInboxScreen() {
                   <Pressable style={styles.secondaryBtn} onPress={() => handleOpenScanner(donationId)}>
                     <ThemedText type="smallBold">Scan QR code</ThemedText>
                   </Pressable>
+                  <View style={styles.certificationRow}>
+                    <Switch
+                      value={Boolean(certifiedByDonationId[donationId])}
+                      onValueChange={(value) =>
+                        setCertifiedByDonationId((previous) => ({ ...previous, [donationId]: value }))
+                      }
+                      accessibilityLabel="Confirm recipient food-use statement"
+                    />
+                    <ThemedText type="small" style={styles.certificationText}>
+                      I confirm no goods or services were provided in exchange, and this food will be used only to care for the ill, needy, or infants as part of our exempt purpose. It will not be transferred for money, property, or services.
+                    </ThemedText>
+                  </View>
                   <Pressable
-                    style={[styles.actionBtn, busyId === donationId && styles.actionBtnDisabled]}
+                    style={[
+                      styles.actionBtn,
+                      (busyId === donationId || !certifiedByDonationId[donationId]) && styles.actionBtnDisabled,
+                    ]}
                     onPress={() => handleConfirmHandoff(donation)}
-                    disabled={busyId === donationId}>
+                    disabled={busyId === donationId || !certifiedByDonationId[donationId]}>
                     {busyId === donationId ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Confirm handoff</ThemedText>}
                   </Pressable>
                 </>
+              ) : null}
+
+              {status === 'received' ? (
+                <Pressable
+                  style={styles.secondaryBtn}
+                  onPress={() => router.push({ pathname: '/donation-acknowledgment', params: { donationId } })}>
+                  <ThemedText type="smallBold">View acknowledgment</ThemedText>
+                </Pressable>
               ) : null}
             </View>
           );
@@ -442,6 +472,15 @@ const styles = StyleSheet.create({
   },
   actionBtnDisabled: {
     opacity: 0.6,
+  },
+  certificationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.two,
+    paddingVertical: Spacing.two,
+  },
+  certificationText: {
+    flex: 1,
   },
   input: {
     borderWidth: 1,

@@ -32,6 +32,10 @@ if (!supabaseUrl || !supabaseAnonKey || !/^https?:\/\//i.test(String(supabaseUrl
   console.error('Error: set SUPABASE_URL to your Supabase Project URL and SUPABASE_ANON_KEY to your anon public key in .env.local');
   process.exit(1);
 }
+if (process.env.NODE_ENV === 'production' && !supabaseServiceRoleKey) {
+  console.error('Error: SUPABASE_SERVICE_ROLE_KEY is required in production');
+  process.exit(1);
+}
 
 const supabaseServerKey = supabaseServiceRoleKey || supabaseAnonKey;
 const supabase = createClient(supabaseUrl, supabaseServerKey);
@@ -444,6 +448,85 @@ async function getDonationById(donationId) {
   return data;
 }
 
+async function buildDonationAcknowledgment(donation) {
+  const donationId = String(getFirstDefined(donation, ['id']) || '');
+  const donorOrgId = String(getFirstDefined(donation, ['donorOrgId', 'donororgid']) || '');
+  const recipientOrgId = String(getFirstDefined(donation, ['recipientOrgId', 'recipientorgid']) || '');
+  const [
+    { data: users, error: usersError },
+    { data: handoff, error: handoffError },
+    { data: confirmationEvent, error: confirmationError },
+  ] = await Promise.all([
+    supabase.from('users').select('*').in('id', [donorOrgId, recipientOrgId]),
+    supabase
+      .from('donation_handoffs')
+      .select('*')
+      .eq('donationId', donationId)
+      .not('usedAt', 'eq', '')
+      .order('usedAt', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('donation_events')
+      .select('*')
+      .eq('donationId', donationId)
+      .eq('eventType', 'handoff_confirmed')
+      .order('createdAt', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (usersError || handoffError || confirmationError) {
+    throw new Error(explainSupabaseError(usersError || handoffError || confirmationError));
+  }
+  if (!handoff) {
+    return null;
+  }
+
+  const normalizedUsers = (users || []).map(normalizeUserRow);
+  const donor = normalizedUsers.find((user) => user?.id === donorOrgId);
+  const recipient = normalizedUsers.find((user) => user?.id === recipientOrgId);
+  const receivedAt = String(getFirstDefined(handoff, ['usedAt', 'usedat']) || getFirstDefined(donation, ['receivedAt', 'receivedat']) || '');
+  const confirmationPayload = parseJsonSafe(getFirstDefined(confirmationEvent, ['payloadJson', 'payloadjson']), {});
+  const estimatedUnitValue = Number(getFirstDefined(donation, ['estimatedUnitValue', 'estimatedunitvalue']) || 0);
+  const receivedQuantity = Number(getFirstDefined(handoff, ['receivedQuantity', 'receivedquantity']) || getFirstDefined(donation, ['quantity']) || 0);
+
+  return {
+    acknowledgmentId: `BRISIO-${donationId.toUpperCase()}`,
+    donationId,
+    receivedAt,
+    donor: {
+      name: donor?.organizationName || donor?.displayName || 'Donor organization',
+      location: donor?.location || '',
+    },
+    recipient: {
+      name: recipient?.organizationName || recipient?.displayName || 'Recipient organization',
+      location: recipient?.location || '',
+    },
+    item: {
+      name: String(getFirstDefined(donation, ['productName', 'productname']) || 'Donated inventory'),
+      brand: String(getFirstDefined(donation, ['productBrand', 'productbrand']) || ''),
+      category: String(getFirstDefined(donation, ['productCategory', 'productcategory']) || 'food'),
+      upc: String(getFirstDefined(donation, ['upc']) || ''),
+      gtin: String(getFirstDefined(donation, ['gtin']) || ''),
+      quantity: receivedQuantity,
+      unit: String(getFirstDefined(handoff, ['receivedUnit', 'receivedunit']) || getFirstDefined(donation, ['unit']) || 'units'),
+      conditionNotes: String(getFirstDefined(donation, ['conditionNotes', 'conditionnotes']) || ''),
+    },
+    donorReportedValue: {
+      unitValue: estimatedUnitValue,
+      totalValue: Number((estimatedUnitValue * receivedQuantity).toFixed(2)),
+      currency: String(getFirstDefined(donation, ['currency']) || 'USD'),
+    },
+    receiptNote: String(getFirstDefined(handoff, ['receiptNote', 'receiptnote']) || ''),
+    certification: {
+      confirmedByRecipientUserId: String(getFirstDefined(handoff, ['receivedByUserId', 'receivedbyuserid']) || ''),
+      foodUseCertified: confirmationPayload.foodUseCertified === true,
+      noGoodsOrServicesProvided: confirmationPayload.noGoodsOrServicesProvided === true,
+    },
+  };
+}
+
 function normalizeUserRow(row) {
   if (!row) return null;
   return {
@@ -518,6 +601,17 @@ function normalizeLocation(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+function publicLocation(value) {
+  const parts = String(value || '').split(',').map((part) => part.trim()).filter(Boolean);
+  if (parts.length >= 4 && /^\d{5}(?:-\d{4})?$/.test(parts.at(-1))) {
+    return `${parts.at(-3)}, ${parts.at(-2)}`;
+  }
+  if (parts.length >= 3) {
+    return `${parts.at(-2)}, ${parts.at(-1)}`;
+  }
+  return parts.join(', ');
+}
+
 function locationSimilarityScore(requestedLocation, listingLocation) {
   const requested = normalizeLocation(requestedLocation);
   const listing = normalizeLocation(listingLocation);
@@ -563,10 +657,12 @@ async function getVisibleActiveListings(user) {
     blockedUserIds = new Set((blockedRows || []).map((row) => getFirstDefined(row, ['blockedUserId', 'blockeduserid'])).filter(Boolean));
   }
 
-  return listings.filter((listing) => {
-    const ownerUserId = String(listing.ownerUserId || listing.owneruserid || '');
-    return isListingVisibleToUser(listing, user) && !isListingExpired(listing) && (!ownerUserId || !blockedUserIds.has(ownerUserId));
-  });
+  return listings
+    .filter((listing) => {
+      const ownerUserId = String(listing.ownerUserId || listing.owneruserid || '');
+      return isListingVisibleToUser(listing, user) && !isListingExpired(listing) && (!ownerUserId || !blockedUserIds.has(ownerUserId));
+    })
+    .map((listing) => ({ ...listing, location: publicLocation(listing.location) }));
 }
 
 async function getBlockedUsersForUser(userId) {
@@ -607,7 +703,7 @@ function flattenEngagement(engagement, listing, owner, requester, messages = [])
     type: getFirstDefined(listing, ['type']),
     description: getFirstDefined(listing, ['description']),
     contact: getFirstDefined(listing, ['contact']),
-    location: getFirstDefined(listing, ['location']),
+    location: publicLocation(getFirstDefined(listing, ['location'])),
     deliverWithinHours: getFirstDefined(listing, ['deliverWithinHours', 'deliverwithinhours']),
     offerClosesAt: getFirstDefined(listing, ['offerClosesAt', 'offerclosesat']),
     urgencyLevel: getFirstDefined(listing, ['urgencyLevel', 'urgencylevel']),
@@ -1572,7 +1668,7 @@ app.post('/api/listings', async (req, res, next) => {
     const { category, description, contact, urgent, deliverWithinHours, offerClosesAt, urgencyLevel, resourceName, resourceType, quantity, availabilityNotes, isPrivate, targetOrganizationId } = req.body;
     const type = req.user.role === 'business' ? 'supply' : 'demand';
     const businessName = req.user.organizationName || req.user.displayName;
-    const location = req.user.location || '';
+    const location = publicLocation(req.user.location);
 
     if (!description) {
       return res.status(400).json({ success: false, error: 'description is required' });
@@ -1649,7 +1745,7 @@ app.get('/api/listings/:id', async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'Access denied' });
     }
 
-    res.json({ success: true, listing });
+    res.json({ success: true, listing: { ...listing, location: publicLocation(listing.location) } });
   } catch (err) {
     console.error('Get listing error:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -1675,11 +1771,31 @@ app.patch('/api/listings/:id', async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'Only the owner can edit this listing' });
     }
 
-    const updatedAt = new Date().toISOString();
-    const updateData = { ...req.body, updatedAt };
-    delete updateData.id;
-    delete updateData.createdAt;
-    delete updateData.ownerUserId;
+    const allowedFields = [
+      'category',
+      'description',
+      'contact',
+      'urgent',
+      'active',
+      'deliverWithinHours',
+      'offerClosesAt',
+      'urgencyLevel',
+      'resourceName',
+      'resourceType',
+      'quantity',
+      'availabilityNotes',
+      'isPrivate',
+      'targetOrganizationId',
+    ];
+    const updateData = Object.fromEntries(
+      allowedFields
+        .filter((field) => Object.hasOwn(req.body || {}, field))
+        .map((field) => [field, req.body[field]])
+    );
+    if (Object.hasOwn(updateData, 'description') && !String(updateData.description || '').trim()) {
+      return res.status(400).json({ success: false, error: 'description cannot be empty' });
+    }
+    updateData.updatedAt = new Date().toISOString();
 
     const { error } = await supabase
       .from('listings')
@@ -2042,7 +2158,7 @@ app.get('/api/organizations', async (req, res) => {
         id: user.id,
         displayName: user.displayName,
         organizationName: user.organizationName || user.displayName,
-        location: user.location || '',
+        location: publicLocation(user.location),
       };
     });
 
@@ -2077,7 +2193,7 @@ app.post('/api/private-offers', async (req, res) => {
       businessname: businessName,
       description,
       contact: contact || '',
-      location: location || req.user.location || '',
+      location: publicLocation(location || req.user.location),
       urgent: 0,
       active: 1,
       ownerUserId: req.user.id,
@@ -2213,6 +2329,9 @@ app.get('/api/reports', async (req, res) => {
   try {
     await requireAuth(req, res, () => {});
     if (!req.user) return;
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'Admin access required' });
+    }
 
     const { data, error } = await supabase
       .from('reports')
@@ -2798,6 +2917,36 @@ app.get('/api/donations/:id', async (req, res) => {
   }
 });
 
+app.get('/api/donations/:id/acknowledgment', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+
+    const donation = await getDonationById(req.params.id);
+    if (!donation) {
+      return res.status(404).json({ success: false, error: 'Donation not found' });
+    }
+
+    const donorOrgId = String(getFirstDefined(donation, ['donorOrgId', 'donororgid']));
+    const recipientOrgId = String(getFirstDefined(donation, ['recipientOrgId', 'recipientorgid']));
+    if (req.user.role !== 'admin' && donorOrgId !== req.user.id && recipientOrgId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'Access denied' });
+    }
+    if (String(getFirstDefined(donation, ['status'])) !== 'received') {
+      return res.status(409).json({ success: false, error: 'The acknowledgment is available after the handoff is confirmed.' });
+    }
+
+    const acknowledgment = await buildDonationAcknowledgment(donation);
+    if (!acknowledgment) {
+      return res.status(409).json({ success: false, error: 'The confirmed handoff record is unavailable.' });
+    }
+
+    res.json({ success: true, acknowledgment });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.post('/api/donations/:id/accept', async (req, res) => {
   try {
     await requireAuth(req, res, () => {});
@@ -2993,6 +3142,10 @@ app.post('/api/donations/:id/confirm-handoff', async (req, res) => {
     const receivedQuantity = Number(req.body?.receivedQuantity || donation.quantity || 0);
     const receivedUnit = String(req.body?.receivedUnit || donation.unit || 'units').trim() || 'units';
     const receiptNote = String(req.body?.receiptNote || '').trim();
+    const foodUseCertified = req.body?.foodUseCertified === true;
+    if (!foodUseCertified) {
+      return res.status(400).json({ success: false, error: 'Confirm the food donation use statement before completing the handoff.' });
+    }
     const now = new Date().toISOString();
 
     const { error: handoffUpdateError } = await supabase
@@ -3029,10 +3182,18 @@ app.post('/api/donations/:id/confirm-handoff', async (req, res) => {
       eventType: 'handoff_confirmed',
       actorUserId: req.user.id,
       actorRole: req.user.role,
-      payload: { receivedQuantity, receivedUnit, receiptNote },
+      payload: {
+        receivedQuantity,
+        receivedUnit,
+        receiptNote,
+        foodUseCertified,
+        noGoodsOrServicesProvided: true,
+      },
     });
 
-    res.json({ success: true, status: 'received' });
+    const receivedDonation = { ...donation, status: 'received', receivedAt: now, receivedat: now };
+    const acknowledgment = await buildDonationAcknowledgment(receivedDonation);
+    res.json({ success: true, status: 'received', acknowledgment });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

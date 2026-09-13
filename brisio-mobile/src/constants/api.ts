@@ -118,6 +118,35 @@ export type ApiDonationTimelineEvent = {
   createdAt: string;
 };
 
+export type ApiDonationAcknowledgment = {
+  acknowledgmentId: string;
+  donationId: string;
+  receivedAt: string;
+  donor: { name: string; location: string };
+  recipient: { name: string; location: string };
+  item: {
+    name: string;
+    brand: string;
+    category: string;
+    upc: string;
+    gtin: string;
+    quantity: number;
+    unit: string;
+    conditionNotes: string;
+  };
+  donorReportedValue: {
+    unitValue: number;
+    totalValue: number;
+    currency: string;
+  };
+  receiptNote: string;
+  certification: {
+    confirmedByRecipientUserId: string;
+    foodUseCertified: boolean;
+    noGoodsOrServicesProvided: boolean;
+  };
+};
+
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   token?: string;
@@ -133,10 +162,9 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     headers.Authorization = `Bearer ${options.token}`;
   }
 
-  const abortController = options.timeoutMs ? new AbortController() : undefined;
-  const timeout = options.timeoutMs
-    ? setTimeout(() => abortController?.abort(), options.timeoutMs)
-    : undefined;
+  const timeoutMs = options.timeoutMs ?? 20000;
+  const abortController = new AbortController();
+  const timeout = setTimeout(() => abortController.abort(), timeoutMs);
 
   let response: Response;
   try {
@@ -144,15 +172,15 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       method: options.method || 'GET',
       headers,
       body: options.body ? JSON.stringify(options.body) : undefined,
-      signal: abortController?.signal,
+      signal: abortController.signal,
     });
-  } catch (error) {
-    if (abortController?.signal.aborted) {
+  } catch {
+    if (abortController.signal.aborted) {
       throw new Error('The request took too long. Please try again.');
     }
-    throw error;
+    throw new Error('Unable to connect to Brisio. Check your internet connection and try again.');
   } finally {
-    if (timeout) clearTimeout(timeout);
+    clearTimeout(timeout);
   }
 
   const rawBody = await response.text();
@@ -241,6 +269,10 @@ export async function getListings(token: string) {
   return apiRequest<{ success: true; count: number; listings: ApiListing[] }>('/api/listings', { token });
 }
 
+export async function getCommunityStats() {
+  return apiRequest<{ success: true; stats: { supply: number; demand: number } }>('/api/stats');
+}
+
 export async function reportListing(
   token: string,
   input: { listingId: string; reason: string; details?: string }
@@ -278,8 +310,24 @@ export async function createListing(
     deliverWithinHours?: string;
   }
 ) {
-  return apiRequest<{ success: true; listing: ApiListing }>('/api/listings', {
+  return apiRequest<{ success: true; listingId: string }>('/api/listings', {
     method: 'POST',
+    token,
+    body: input,
+  });
+}
+
+export async function updateListing(
+  token: string,
+  listingId: string,
+  input: {
+    category: string;
+    description: string;
+    contact: string;
+  }
+) {
+  return apiRequest<{ success: true }>(`/api/listings/${encodeURIComponent(listingId)}`, {
+    method: 'PATCH',
     token,
     body: input,
   });
@@ -405,13 +453,29 @@ export async function generateDonationHandoffToken(token: string, donationId: st
 export async function confirmDonationHandoff(
   token: string,
   donationId: string,
-  input: { handoffToken: string; receivedQuantity?: number; receivedUnit?: string; receiptNote?: string }
+  input: {
+    handoffToken: string;
+    receivedQuantity?: number;
+    receivedUnit?: string;
+    receiptNote?: string;
+    foodUseCertified: boolean;
+  }
 ) {
-  return apiRequest<{ success: true; status: 'received' }>(`/api/donations/${encodeURIComponent(donationId)}/confirm-handoff`, {
-    method: 'POST',
-    token,
-    body: input,
-  });
+  return apiRequest<{ success: true; status: 'received'; acknowledgment: ApiDonationAcknowledgment }>(
+    `/api/donations/${encodeURIComponent(donationId)}/confirm-handoff`,
+    {
+      method: 'POST',
+      token,
+      body: input,
+    }
+  );
+}
+
+export async function getDonationAcknowledgment(token: string, donationId: string) {
+  return apiRequest<{ success: true; acknowledgment: ApiDonationAcknowledgment }>(
+    `/api/donations/${encodeURIComponent(donationId)}/acknowledgment`,
+    { token }
+  );
 }
 
 export async function getDonationImpactSummary(token: string) {

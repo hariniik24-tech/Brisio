@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ApiListing, createListing, deleteListing, getDonationImpactSummary, getListings } from '@/constants/api';
+import { ApiListing, deleteListing, getDonationImpactSummary, getListings, updateListing } from '@/constants/api';
 import { API_BASE_URL } from '@/constants/config';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
@@ -13,11 +13,6 @@ import { Link, useRouter } from 'expo-router';
 const INPUT_PLACEHOLDER_COLOR = '#6A7685';
 const DONATION_SUMMARY_FALLBACK_MESSAGE = 'Donation metrics are temporarily unavailable. Please refresh shortly.';
 
-type Stats = {
-  supply: number;
-  demand: number;
-};
-
 type DonationSummary = {
   itemsDonated: number;
   estimatedInventoryValue: number;
@@ -25,36 +20,15 @@ type DonationSummary = {
   completedPickups: number;
 };
 
-type ListingForm = {
-  category: string;
-  description: string;
-  contact: string;
-  urgencyLevel: 'low' | 'medium' | 'high' | 'critical';
-  deliverWithinHours: string;
-};
-
-const emptyStats: Stats = { supply: 0, demand: 0 };
 const emptyDonationSummary: DonationSummary = {
   itemsDonated: 0,
   estimatedInventoryValue: 0,
   recipientCount: 0,
   completedPickups: 0,
 };
-const initialForm: ListingForm = {
-  category: '',
-  description: '',
-  contact: '',
-  urgencyLevel: 'medium',
-  deliverWithinHours: '',
-};
-
 export default function HomeScreen() {
   const router = useRouter();
   const session = useSessionContext();
-  const [stats, setStats] = useState<Stats>(emptyStats);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [statsError, setStatsError] = useState('');
-
   const [listings, setListings] = useState<ApiListing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(false);
   const [donationSummary, setDonationSummary] = useState<DonationSummary>(emptyDonationSummary);
@@ -62,10 +36,10 @@ export default function HomeScreen() {
   const [donationSummaryError, setDonationSummaryError] = useState('');
   const [donationSummaryUpdatedAt, setDonationSummaryUpdatedAt] = useState('');
 
-  const [form, setForm] = useState<ListingForm>(initialForm);
-  const listingSubmittingRef = useRef(false);
-  const [listingSubmitting, setListingSubmitting] = useState(false);
   const [deletingListingId, setDeletingListingId] = useState('');
+  const [editingListingId, setEditingListingId] = useState('');
+  const [editForm, setEditForm] = useState({ category: '', description: '', contact: '' });
+  const [listingUpdating, setListingUpdating] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [aiPrompt, setAiPrompt] = useState('');
@@ -74,28 +48,10 @@ export default function HomeScreen() {
   const [aiError, setAiError] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
 
-  const endpoint = useMemo(() => `${API_BASE_URL}/api/stats`, []);
-
-  async function loadStats() {
-    setStatsLoading(true);
-    setStatsError('');
-    try {
-      const response = await fetch(endpoint);
-      const payload = await response.json();
-      if (!response.ok || !payload.success || !payload.stats) {
-        throw new Error('Could not load stats');
-      }
-      setStats({
-        supply: payload.stats.supply || 0,
-        demand: payload.stats.demand || 0,
-      });
-    } catch {
-      setStatsError('Unable to reach backend stats. Update apiBaseUrl in app.json for device testing.');
-      setStats(emptyStats);
-    } finally {
-      setStatsLoading(false);
-    }
-  }
+  const myListings = useMemo(
+    () => listings.filter((listing) => listing.ownerUserId === session.user?.id),
+    [listings, session.user?.id]
+  );
 
   async function loadListings() {
     if (!session.token) return;
@@ -125,34 +81,6 @@ export default function HomeScreen() {
       setDonationSummaryLoading(false);
     }
   }
-
-  useEffect(() => {
-    let isActive = true;
-    (async () => {
-      if (!isActive) return;
-      try {
-        const response = await fetch(endpoint);
-        const payload = await response.json();
-        if (!response.ok || !payload.success || !payload.stats) {
-          throw new Error('Could not load stats');
-        }
-        if (!isActive) return;
-        setStats({
-          supply: payload.stats.supply || 0,
-          demand: payload.stats.demand || 0,
-        });
-      } catch {
-        if (!isActive) return;
-        setStatsError('Unable to reach backend stats. Update apiBaseUrl in app.json for device testing.');
-        setStats(emptyStats);
-      } finally {
-        if (isActive) setStatsLoading(false);
-      }
-    })();
-    return () => {
-      isActive = false;
-    };
-  }, [endpoint]);
 
   useEffect(() => {
     if (!session.isAuthenticated || !session.token) return;
@@ -197,52 +125,6 @@ export default function HomeScreen() {
     };
   }, [session.isAuthenticated, session.token]);
 
-  async function submitListing() {
-    if (!session.token || !session.user || listingSubmittingRef.current) return;
-    setFormError('');
-    setFormSuccess('');
-
-    if (!form.category.trim() || !form.description.trim()) {
-      setFormError('Category and description are required.');
-      return;
-    }
-
-    listingSubmittingRef.current = true;
-    setListingSubmitting(true);
-    try {
-      const payload: {
-        category: string;
-        description: string;
-        contact: string;
-        location: string;
-        urgencyLevel?: 'low' | 'medium' | 'high' | 'critical';
-        deliverWithinHours?: string;
-      } = {
-        category: form.category.trim().toLowerCase(),
-        description: form.description.trim(),
-        contact: form.contact.trim(),
-        location: session.user.location,
-      };
-
-      if (session.user.role === 'organization') {
-        payload.urgencyLevel = form.urgencyLevel;
-      }
-      if (session.user.role === 'business' && form.deliverWithinHours.trim()) {
-        payload.deliverWithinHours = form.deliverWithinHours.trim();
-      }
-
-      await createListing(session.token, payload);
-      setFormSuccess('Listing posted successfully.');
-      setForm(initialForm);
-      await Promise.all([loadListings(), loadStats()]);
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not post listing.');
-    } finally {
-      listingSubmittingRef.current = false;
-      setListingSubmitting(false);
-    }
-  }
-
   function confirmDeleteListing(listing: ApiListing) {
     if (!session.token || listing.ownerUserId !== session.user?.id) return;
 
@@ -258,7 +140,7 @@ export default function HomeScreen() {
           try {
             await deleteListing(session.token!, listing.id);
             setFormSuccess('Listing deleted.');
-            await Promise.all([loadListings(), loadStats()]);
+            await loadListings();
           } catch (err) {
             setFormError(err instanceof Error ? err.message : 'Could not delete listing.');
           } finally {
@@ -267,6 +149,43 @@ export default function HomeScreen() {
         },
       },
     ]);
+  }
+
+  function beginEditListing(listing: ApiListing) {
+    setEditingListingId(listing.id);
+    setEditForm({
+      category: listing.category,
+      description: listing.description,
+      contact: listing.contact,
+    });
+    setFormError('');
+    setFormSuccess('');
+  }
+
+  async function saveListingEdits() {
+    if (!session.token || !editingListingId || listingUpdating) return;
+    if (!editForm.category.trim() || !editForm.description.trim()) {
+      setFormError('Category and description are required.');
+      return;
+    }
+
+    setListingUpdating(true);
+    setFormError('');
+    setFormSuccess('');
+    try {
+      await updateListing(session.token, editingListingId, {
+        category: editForm.category.trim().toLowerCase(),
+        description: editForm.description.trim(),
+        contact: editForm.contact.trim(),
+      });
+      setEditingListingId('');
+      setFormSuccess('Listing updated.');
+      await loadListings();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Could not update listing.');
+    } finally {
+      setListingUpdating(false);
+    }
   }
 
   async function runAiAssistant() {
@@ -324,15 +243,12 @@ export default function HomeScreen() {
           </View>
 
           <ThemedView style={styles.heroSection}>
-            <Image source={require('@/assets/images/icon.png')} style={styles.heroLogo} resizeMode="contain" />
-            <ThemedText type="title" style={styles.title}>
-              Brisio
-            </ThemedText>
+            <View style={styles.brandRow}>
+              <Image source={require('@/assets/images/icon.png')} style={styles.heroLogo} resizeMode="contain" />
+              <ThemedText type="title" style={styles.title}>Brisio</ThemedText>
+            </View>
             <ThemedText type="small" style={styles.subtitle}>
               Bridging resources. Strengthening communities.
-            </ThemedText>
-            <ThemedText type="small" style={styles.heroCaption}>
-              Brisio helps businesses and nonprofits share resources, post requests, and coordinate support in one place.
             </ThemedText>
           </ThemedView>
 
@@ -354,22 +270,6 @@ export default function HomeScreen() {
           ) : (
             <>
               <ThemedView type="backgroundElement" style={styles.panel}>
-                <ThemedText type="smallBold">
-                  Signed in as {session.user.organizationName || session.user.displayName}
-                </ThemedText>
-                <ThemedText type="small">
-                  Role: {session.user.role === 'organization' ? 'nonprofit' : session.user.role}
-                </ThemedText>
-                <ThemedView style={styles.rolePathPanel}>
-                  <ThemedText type="smallBold">
-                    {session.user.role === 'organization' ? 'Nonprofit path: Explore + Chats' : 'Business path: Offer + Chats'}
-                  </ThemedText>
-                  <ThemedText type="small" style={styles.rolePathText}>
-                    {session.user.role === 'organization'
-                      ? 'Explore active offers, then open Chats to send a request.'
-                      : 'Post available resources, then use Chats to coordinate accepted requests.'}
-                  </ThemedText>
-                </ThemedView>
                 {session.user.role === 'business' ? (
                   <Link href="/donate-inventory" asChild>
                     <Pressable style={styles.secondaryBtn}>
@@ -389,7 +289,7 @@ export default function HomeScreen() {
               <ThemedView type="backgroundElement" style={styles.panel}>
                 <ThemedText type="smallBold">AI assistant</ThemedText>
                 <ThemedText type="small" style={styles.helperText}>
-                  Ask for live recommendations based on current listings and your role.
+                  Ask for recommendations based on current listings.
                 </ThemedText>
                 <TextInput
                   style={[styles.input, styles.multilineInput]}
@@ -411,101 +311,90 @@ export default function HomeScreen() {
                 {!!aiError && <ThemedText style={styles.errorText}>{aiError}</ThemedText>}
               </ThemedView>
 
-              <ThemedView
-                type="backgroundElement"
-                style={[
-                  styles.panel,
-                  session.user.role === 'business' ? styles.businessListingPanel : styles.nonprofitListingPanel,
-                ]}>
-                <ThemedText type="smallBold">
-                  {session.user.role === 'business' ? 'Create business offer' : 'Create nonprofit need'}
-                </ThemedText>
-                <ThemedText type="small" style={styles.helperText}>
-                  {session.user.role === 'business'
-                    ? 'Post available resources for nonprofits to discover and request.'
-                    : 'Post what your nonprofit needs so businesses can respond with support.'}
-                </ThemedText>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Category (space, time, equipment, service, food, other)"
-                  placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-                  value={form.category}
-                  onChangeText={(value) => setForm((prev) => ({ ...prev, category: value }))}
-                />
-                <TextInput
-                  style={[styles.input, styles.multilineInput]}
-                  placeholder="Description"
-                  placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-                  multiline
-                  value={form.description}
-                  onChangeText={(value) => setForm((prev) => ({ ...prev, description: value }))}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Contact"
-                  placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-                  value={form.contact}
-                  onChangeText={(value) => setForm((prev) => ({ ...prev, contact: value }))}
-                />
-                <ThemedText type="small" style={styles.helperText}>
-                  Location: {session.user.location}
-                </ThemedText>
-                {session.user.role !== 'organization' ? (
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Deliver within hours (optional)"
-                    placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-                    keyboardType="numeric"
-                    value={form.deliverWithinHours}
-                    onChangeText={(value) => setForm((prev) => ({ ...prev, deliverWithinHours: value }))}
-                  />
-                ) : null}
-                <Pressable
-                  style={[styles.primaryBtn, listingSubmitting && styles.disabledBtn]}
-                  onPress={submitListing}
-                  disabled={listingSubmitting}>
-                  <ThemedText type="smallBold">
-                    {listingSubmitting
-                      ? 'Posting...'
-                      : session.user.role === 'business'
-                        ? 'Post offer listing'
-                        : 'Post need listing'}
-                  </ThemedText>
-                </Pressable>
+              <ThemedView type="backgroundElement" style={styles.panel}>
+                <View style={styles.sectionHeadingRow}>
+                  <ThemedText type="smallBold">My listings</ThemedText>
+                  <Pressable style={styles.createListingBtn} onPress={() => router.push('/create-listing')}>
+                    <ThemedText type="smallBold">Create listing</ThemedText>
+                  </Pressable>
+                </View>
                 {!!formError && <ThemedText style={styles.errorText}>{formError}</ThemedText>}
                 {!!formSuccess && <ThemedText style={styles.successText}>{formSuccess}</ThemedText>}
-              </ThemedView>
-
-              <ThemedView type="backgroundElement" style={styles.panel}>
-                <ThemedText type="smallBold">Recent listings</ThemedText>
                 {listingsLoading ? (
                   <ThemedView style={styles.loadingRow}>
                     <ActivityIndicator size="small" />
-                    <ThemedText type="small">Loading listings...</ThemedText>
+                    <ThemedText type="small">Loading your listings...</ThemedText>
                   </ThemedView>
-                ) : listings.length === 0 ? (
-                  <ThemedText type="small">No listings yet.</ThemedText>
+                ) : myListings.length === 0 ? (
+                  <ThemedText type="small">You have not posted any listings yet.</ThemedText>
                 ) : (
-                  listings.slice(0, 8).map((item) => (
+                  myListings.map((item) => (
                     <ThemedView key={item.id} style={styles.listingItem}>
-                      <ThemedText type="smallBold">{item.businessName}</ThemedText>
-                      <ThemedText type="small">
-                        {item.category} | {item.type === 'supply' ? 'Business offer' : 'Nonprofit need'}
-                      </ThemedText>
-                      <ThemedText type="small">{item.description}</ThemedText>
-                      <ThemedText type="small">{item.location}</ThemedText>
-                      {item.ownerUserId === session.user?.id ? (
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`Delete ${item.category} listing`}
-                          style={[styles.deleteListingBtn, deletingListingId === item.id && styles.disabledBtn]}
-                          onPress={() => confirmDeleteListing(item)}
-                          disabled={Boolean(deletingListingId)}>
-                          <ThemedText type="smallBold" style={styles.deleteListingText}>
-                            {deletingListingId === item.id ? 'Deleting...' : 'Delete listing'}
+                      {editingListingId === item.id ? (
+                        <>
+                          <TextInput
+                            accessibilityLabel="Listing category"
+                            style={styles.input}
+                            placeholder="Category"
+                            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+                            value={editForm.category}
+                            onChangeText={(value) => setEditForm((previous) => ({ ...previous, category: value }))}
+                          />
+                          <TextInput
+                            accessibilityLabel="Listing description"
+                            style={[styles.input, styles.multilineInput]}
+                            placeholder="Description"
+                            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+                            multiline
+                            value={editForm.description}
+                            onChangeText={(value) => setEditForm((previous) => ({ ...previous, description: value }))}
+                          />
+                          <TextInput
+                            accessibilityLabel="Listing contact"
+                            style={styles.input}
+                            placeholder="Contact"
+                            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+                            value={editForm.contact}
+                            onChangeText={(value) => setEditForm((previous) => ({ ...previous, contact: value }))}
+                          />
+                          <View style={styles.modeRow}>
+                            <Pressable style={[styles.primaryBtn, listingUpdating && styles.disabledBtn]} onPress={saveListingEdits} disabled={listingUpdating}>
+                              <ThemedText type="smallBold">{listingUpdating ? 'Saving...' : 'Save changes'}</ThemedText>
+                            </Pressable>
+                            <Pressable style={styles.secondaryBtn} onPress={() => setEditingListingId('')} disabled={listingUpdating}>
+                              <ThemedText type="smallBold">Cancel</ThemedText>
+                            </Pressable>
+                          </View>
+                        </>
+                      ) : (
+                        <>
+                          <ThemedText type="smallBold">{item.category}</ThemedText>
+                          <ThemedText type="small">
+                            {item.type === 'supply' ? 'Available resource' : 'Resource request'}
                           </ThemedText>
-                        </Pressable>
-                      ) : null}
+                          <ThemedText type="small">{item.description}</ThemedText>
+                          <ThemedText type="small">{item.location}</ThemedText>
+                          <View style={styles.modeRow}>
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel={`Edit ${item.category} listing`}
+                              style={styles.secondaryBtn}
+                              onPress={() => beginEditListing(item)}>
+                              <ThemedText type="smallBold">Edit</ThemedText>
+                            </Pressable>
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel={`Delete ${item.category} listing`}
+                              style={[styles.deleteListingBtn, deletingListingId === item.id && styles.disabledBtn]}
+                              onPress={() => confirmDeleteListing(item)}
+                              disabled={Boolean(deletingListingId)}>
+                              <ThemedText type="smallBold" style={styles.deleteListingText}>
+                                {deletingListingId === item.id ? 'Deleting...' : 'Delete'}
+                              </ThemedText>
+                            </Pressable>
+                          </View>
+                        </>
+                      )}
                     </ThemedView>
                   ))
                 )}
@@ -521,8 +410,8 @@ export default function HomeScreen() {
                 ) : (
                   <ThemedText type="small">
                     {session.user.role === 'business'
-                      ? 'Business view: track inventory value and completed pickups.'
-                      : 'Nonprofit view: track received supply and partner coverage.'}
+                      ? 'Track shared inventory value and completed pickups.'
+                      : 'Track incoming resources and partner activity.'}
                   </ThemedText>
                 )}
 
@@ -570,46 +459,6 @@ export default function HomeScreen() {
               </Pressable>
             </>
           )}
-
-          {session.isAuthenticated ? <>
-            <ThemedView type="backgroundElement" style={styles.panel}>
-              <ThemedText type="smallBold">Active community listings</ThemedText>
-              {statsLoading ? (
-                <ThemedView style={styles.loadingRow}>
-                  <ActivityIndicator size="small" />
-                  <ThemedText type="small">Loading community activity...</ThemedText>
-                </ThemedView>
-              ) : (
-                <ThemedText type="small">Current offers and needs across all Brisio accounts.</ThemedText>
-              )}
-              {!!statsError && <ThemedText style={styles.errorText}>{statsError}</ThemedText>}
-            </ThemedView>
-
-            <ThemedView style={styles.statsGrid}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="View business offers"
-              style={styles.statTileLink}
-              onPress={() => router.push('/explore')}>
-              <ThemedView type="backgroundElement" style={styles.statTile}>
-                <ThemedText type="small">Business offers</ThemedText>
-                <ThemedText type="subtitle">{stats.supply}</ThemedText>
-                <ThemedText type="small" style={styles.helperText}>View in Explore</ThemedText>
-              </ThemedView>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="View nonprofit needs"
-              style={styles.statTileLink}
-              onPress={() => router.push('/explore')}>
-              <ThemedView type="backgroundElement" style={styles.statTile}>
-                <ThemedText type="small">Nonprofit needs</ThemedText>
-                <ThemedText type="subtitle">{stats.demand}</ThemedText>
-                <ThemedText type="small" style={styles.helperText}>View in Explore</ThemedText>
-              </ThemedView>
-            </Pressable>
-            </ThemedView>
-          </> : null}
 
         </SafeAreaView>
       </ThemedView>
@@ -681,11 +530,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#E2F2EA',
   },
   heroSection: {
-    gap: Spacing.two,
-    marginTop: Spacing.two,
+    gap: Spacing.one,
     borderRadius: Spacing.four,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.four,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
     backgroundColor: '#EEF5FD',
     borderWidth: 1,
     borderColor: '#DCE5F0',
@@ -696,24 +544,25 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   heroLogo: {
-    width: 68,
-    height: 68,
-    borderRadius: 16,
+    width: 42,
+    height: 42,
+    borderRadius: 10,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   title: {
     textAlign: 'left',
-    fontSize: 40,
-    lineHeight: 44,
+    fontSize: 30,
+    lineHeight: 34,
     color: '#1E2F46',
   },
   subtitle: {
     opacity: 0.9,
     color: '#2F4967',
     letterSpacing: 0.2,
-  },
-  heroCaption: {
-    color: '#556B84',
-    lineHeight: 20,
   },
   panel: {
     borderRadius: Spacing.four,
@@ -730,14 +579,6 @@ const styles = StyleSheet.create({
   },
   authPanel: {
     backgroundColor: '#FFFFFF',
-  },
-  businessListingPanel: {
-    backgroundColor: '#F8FCFF',
-    borderColor: '#D5E6F6',
-  },
-  nonprofitListingPanel: {
-    backgroundColor: '#F7FBF6',
-    borderColor: '#D8E8D4',
   },
   modeRow: {
     flexDirection: 'row',
@@ -827,18 +668,6 @@ const styles = StyleSheet.create({
     borderColor: '#CDD5E1',
     backgroundColor: '#F7F9FC',
   },
-  rolePathPanel: {
-    borderWidth: 1,
-    borderColor: '#D6E2EF',
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    backgroundColor: '#F5FAFF',
-    gap: Spacing.one,
-  },
-  rolePathText: {
-    color: '#4E6682',
-  },
   forgotLinkBtn: {
     alignSelf: 'flex-start',
     marginTop: Spacing.one,
@@ -858,11 +687,19 @@ const styles = StyleSheet.create({
   successText: {
     color: '#256A4A',
   },
-  statsGrid: {
+  sectionHeadingRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: Spacing.two,
-    paddingBottom: Spacing.three,
+  },
+  createListingBtn: {
+    borderWidth: 1,
+    borderColor: '#9CB4D6',
+    borderRadius: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two,
+    backgroundColor: '#EAF2FC',
   },
   impactGrid: {
     flexDirection: 'row',
@@ -880,19 +717,6 @@ const styles = StyleSheet.create({
     borderColor: '#D8E4F1',
     backgroundColor: '#F7FBFF',
   },
-  statTile: {
-    width: '100%',
-    borderRadius: Spacing.four,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    gap: Spacing.one,
-    borderWidth: 1,
-    borderColor: '#DCE4EE',
-  },
-  statTileLink: {
-    width: '48%',
-    minWidth: 140,
-  },
   disabledBtn: {
     opacity: 0.6,
   },
@@ -905,8 +729,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#FBFCFE',
   },
   deleteListingBtn: {
-    alignSelf: 'flex-start',
-    paddingVertical: Spacing.one,
+    width: '100%',
+    marginTop: Spacing.one,
+    borderWidth: 1,
+    borderColor: '#C94A43',
+    borderRadius: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.two,
+    alignItems: 'center',
+    backgroundColor: '#FFF5F4',
   },
   deleteListingText: {
     color: '#A12A2A',

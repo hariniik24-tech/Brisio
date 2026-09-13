@@ -514,6 +514,28 @@ export default function DonateInventoryScreen() {
             })
         )}
 
+        <View style={styles.sectionDivider} />
+        <ThemedText type="smallBold">Completed donations</ThemedText>
+        <ThemedText type="small">Acknowledgments become available after the nonprofit confirms the QR handoff.</ThemedText>
+        {myDonations.filter((donation) => donation.status === 'received').length === 0 ? (
+          <ThemedText type="small">No completed donations yet.</ThemedText>
+        ) : (
+          myDonations
+            .filter((donation) => donation.status === 'received')
+            .slice(0, 8)
+            .map((donation) => (
+              <View key={donation.id} style={styles.card}>
+                <ThemedText type="smallBold">{donation.productName || 'Donated inventory'}</ThemedText>
+                <ThemedText type="small">Quantity: {donation.quantity} {donation.unit}</ThemedText>
+                <Pressable
+                  style={styles.secondaryBtn}
+                  onPress={() => router.push({ pathname: '/donation-acknowledgment', params: { donationId: donation.id } })}>
+                  <ThemedText type="smallBold">View acknowledgment</ThemedText>
+                </Pressable>
+              </View>
+            ))
+        )}
+
         {!!message ? <ThemedText type="small">{message}</ThemedText> : null}
       </ScrollView>
     </StackScreenShell>

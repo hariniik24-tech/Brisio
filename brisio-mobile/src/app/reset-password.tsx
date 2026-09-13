@@ -106,7 +106,10 @@ export default function ResetPasswordScreen() {
         onChangeText={setConfirmPassword}
       />
 
-      <Pressable style={styles.primaryBtn} onPress={handleResetPassword}>
+      <Pressable
+        style={[styles.primaryBtn, busy && styles.primaryBtnDisabled]}
+        onPress={handleResetPassword}
+        disabled={busy}>
         {busy ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Reset my password</ThemedText>}
       </Pressable>
 
@@ -146,6 +149,9 @@ const styles = StyleSheet.create({
     borderColor: '#476C9D',
     backgroundColor: '#CFE1F8',
     marginTop: Spacing.one,
+  },
+  primaryBtnDisabled: {
+    opacity: 0.45,
   },
   helpBox: {
     borderWidth: 1,

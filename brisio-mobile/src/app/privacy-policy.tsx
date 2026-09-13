@@ -22,7 +22,6 @@ When you create a Brisio account, we may collect:
 - Name
 - Email address
 - Password or authentication credentials
-- Phone number
 - Organization or business name
 Your password is used to authenticate your account. Brisio does not use your password for advertising or unrelated purposes.
 
@@ -85,7 +84,7 @@ We may share information in the following circumstances.
 A. With Service Providers
 We may use third-party service providers that help us operate Brisio.
 
-Brisio currently uses Supabase for backend services such as authentication, database functionality, and related infrastructure.
+Brisio currently uses Supabase for database infrastructure, Render for API hosting, and an email delivery provider for password-reset messages.
 
 Supabase may process information on our behalf as necessary to provide these services.
 
@@ -117,7 +116,7 @@ However, no electronic storage or transmission system can be guaranteed to be co
 
 You are responsible for maintaining the confidentiality of your account credentials and should notify us if you believe your account has been compromised.
 
-Brisio uses Supabase as part of its backend infrastructure. Supabase provides security controls for its platform, including controls applicable to database, authentication, storage, and related services.
+Brisio uses Supabase as part of its database infrastructure. Supabase provides security controls for its platform, including controls applicable to database and related services.
 
 5. Data Retention
 We retain personal information for as long as reasonably necessary to provide the Service, maintain accounts, comply with legal obligations, resolve disputes, enforce agreements, prevent abuse, and protect our legitimate interests.
@@ -150,7 +149,7 @@ You may exercise available rights by contacting us at: hariniik24@gmail.com
 We may need to verify your identity before fulfilling certain requests.
 
 8. Communications
-We may use your email address or phone number to provide account-related communications, security notifications, service announcements, and responses to support requests.
+We may use your email address to provide account-related communications, security notifications, service announcements, and responses to support requests.
 
 We will not use your contact information for unrelated promotional purposes unless permitted by applicable law and, where required, with your consent.
 
@@ -168,7 +167,7 @@ If Brisio's intended age range or user eligibility changes, this section will be
 10. Third-Party Services
 Brisio may rely on third-party services to operate certain features.
 
-Our current backend provider is Supabase, used for services including authentication, database infrastructure, and related backend functionality.
+Our current service providers include Supabase for database infrastructure, Render for API hosting, and an email delivery provider for password-reset messages.
 
 As Brisio develops, we may add additional services such as analytics, crash reporting, email delivery, cloud storage, or other infrastructure providers.
 
@@ -209,8 +208,6 @@ If you have questions, concerns, or requests regarding this Privacy Policy or Br
 
 Brisio
 Email: hariniik24@gmail.com
-Website: [BRISIO WEBSITE URL]
-
 For privacy-specific requests, please include Privacy Request in the subject line of your email.
 
 Last Updated: August 11, 2026`;

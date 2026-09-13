@@ -226,3 +226,21 @@ CREATE INDEX IF NOT EXISTS idx_donation_records_recipient_compat ON donation_rec
 CREATE INDEX IF NOT EXISTS idx_donation_records_created_compat ON donation_records("createdAt");
 CREATE INDEX IF NOT EXISTS idx_donation_events_donation_compat ON donation_events("donationId");
 CREATE INDEX IF NOT EXISTS idx_donation_handoffs_donation_compat ON donation_handoffs("donationId");
+
+-- All mobile access passes through the trusted Render API. The service_role key
+-- bypasses RLS; anon and authenticated clients receive no direct table access.
+ALTER TABLE listings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE engagements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE engagement_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE blocks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE password_reset_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE donation_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE donation_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE donation_handoffs ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE listings, engagements, engagement_messages, reports, blocks,
+  password_reset_tokens, users, sessions, donation_records, donation_events,
+  donation_handoffs FROM anon, authenticated;

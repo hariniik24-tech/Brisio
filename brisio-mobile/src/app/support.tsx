@@ -48,8 +48,7 @@ export default function SupportScreen() {
           </Pressable>
         </View>
         <ThemedText type="small">
-          If a feature requires location, allow it on device so nearby listings and distance-based
-          matching can work correctly.
+          Include the screen name and a short description of the issue so we can help quickly.
         </ThemedText>
     </StackScreenShell>
   );

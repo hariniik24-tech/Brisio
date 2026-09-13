@@ -11,7 +11,7 @@
       "icon": "./assets/images/icon.png",
       "supportsTablet": true,
       "bundleIdentifier": "com.brisio.app",
-      "buildNumber": "53",
+      "buildNumber": "54",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -48,7 +48,9 @@
           "imageWidth": 160
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "expo-image",
+      "expo-web-browser"
     ],
     "extra": {
       "apiBaseUrl": "https://brisio-api-gofb.onrender.com",

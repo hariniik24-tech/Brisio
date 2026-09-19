@@ -119,7 +119,7 @@ export default function CreateDonationRecordScreen() {
     setHasScanned(false);
     setMessage('');
 
-    if (Platform.OS !== 'web' && CameraView.isModernBarcodeScannerAvailable) {
+    if (Platform.OS === 'android' && CameraView.isModernBarcodeScannerAvailable) {
       scannerSubscriptionRef.current?.remove();
       scannerSubscriptionRef.current = CameraView.onModernBarcodeScanned((result) => {
         if (scanHandledRef.current) return;

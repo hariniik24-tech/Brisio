@@ -710,6 +710,86 @@ const SAMPLE_PRODUCT_CATALOG = {
   },
 };
 
+const productLookupCache = new Map();
+const PRODUCT_LOOKUP_CACHE_MS = 24 * 60 * 60 * 1000;
+
+async function fetchProductJson(url) {
+  const response = await fetch(url, {
+    headers: { Accept: 'application/json', 'User-Agent': 'Brisio/1.0 product lookup' },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!response.ok) return null;
+  return response.json();
+}
+
+function medianPrice(values) {
+  const prices = values.filter((value) => Number.isFinite(value) && value > 0).sort((a, b) => a - b);
+  if (!prices.length) return null;
+  const middle = Math.floor(prices.length / 2);
+  const value = prices.length % 2 ? prices[middle] : (prices[middle - 1] + prices[middle]) / 2;
+  return Number(value.toFixed(2));
+}
+
+async function lookupExternalProduct(barcode) {
+  const cached = productLookupCache.get(barcode);
+  if (cached?.expiresAt > Date.now()) return cached.value;
+
+  let openFoodFacts = null;
+  let openPrices = null;
+  try {
+    [openFoodFacts, openPrices] = await Promise.all([
+      fetchProductJson(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=code,product_name,brands,categories_tags`),
+      fetchProductJson(`https://prices.openfoodfacts.org/api/v1/prices?product_code=${encodeURIComponent(barcode)}&page_size=20`),
+    ]);
+  } catch (err) {
+    console.warn('Open Food Facts lookup failed:', err.message);
+  }
+
+  const openProduct = openFoodFacts?.status === 1 ? openFoodFacts.product : null;
+  const usdPrices = (openPrices?.items || [])
+    .filter((item) => item.currency === 'USD')
+    .map((item) => Number(item.price));
+  let estimatedUnitValue = medianPrice(usdPrices);
+  let priceSource = estimatedUnitValue ? 'Open Prices observed USD price' : '';
+  let upcItem = null;
+
+  if (!openProduct?.product_name || !openProduct?.brands || !estimatedUnitValue) {
+    try {
+      const upcResponse = await fetchProductJson(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`);
+      upcItem = upcResponse?.items?.[0] || null;
+      if (!estimatedUnitValue && upcItem) {
+        const recentCutoff = Math.floor(Date.now() / 1000) - (2 * 365 * 24 * 60 * 60);
+        const offerPrices = (upcItem.offers || [])
+          .filter((offer) => Number(offer.updated_t || 0) >= recentCutoff && !/out of stock/i.test(String(offer.availability || '')))
+          .map((offer) => Number(offer.price));
+        estimatedUnitValue = medianPrice(offerPrices);
+        if (estimatedUnitValue) priceSource = 'UPCitemdb recent retailer estimate';
+      }
+    } catch (err) {
+      console.warn('UPCitemdb lookup failed:', err.message);
+    }
+  }
+
+  const name = String(openProduct?.product_name || upcItem?.title || '').trim();
+  const brand = String(openProduct?.brands || upcItem?.brand || '').split(',')[0].trim();
+  const value = name ? {
+    gtin: normalizeGtinFromBarcode(barcode),
+    upc: barcode,
+    name,
+    brand: brand || 'Brand not listed',
+    category: openProduct ? 'food' : detectCategory(`${upcItem?.category || ''} ${name}`),
+    estimatedUnitValue: estimatedUnitValue || undefined,
+    priceSource: priceSource || undefined,
+  } : null;
+
+  if (productLookupCache.size >= 500) productLookupCache.clear();
+  productLookupCache.set(barcode, {
+    expiresAt: Date.now() + (value ? PRODUCT_LOOKUP_CACHE_MS : 5 * 60 * 1000),
+    value,
+  });
+  return value;
+}
+
 function tokenize(text) {
   return text.toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
@@ -2297,16 +2377,17 @@ app.post('/api/products/lookup', async (req, res) => {
       return res.status(400).json({ success: false, error: 'barcode is required' });
     }
 
-    const fromCatalog = SAMPLE_PRODUCT_CATALOG[barcode];
-    const product = fromCatalog || {
+    const externalProduct = await lookupExternalProduct(barcode);
+    const fromCatalog = externalProduct ? null : SAMPLE_PRODUCT_CATALOG[barcode];
+    const product = externalProduct || fromCatalog || {
       gtin: normalizeGtinFromBarcode(barcode),
       upc: barcode,
       name: `Scanned item ${barcode}`,
-      brand: 'Unknown brand',
+      brand: 'Brand not found',
       category: 'food',
     };
 
-    res.json({ success: true, product, source: fromCatalog ? 'sample-catalog' : 'fallback' });
+    res.json({ success: true, product, source: externalProduct ? 'product-databases' : fromCatalog ? 'sample-catalog' : 'fallback' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

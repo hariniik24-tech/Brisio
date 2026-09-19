@@ -86,7 +86,13 @@ export default function CreateDonationRecordScreen() {
       const response = await lookupProductByBarcode(session.token, { barcode: cleanedBarcode, format: 'upc-a' });
       setProduct(response.product);
       setBarcode(cleanedBarcode);
-      setMessage('Item identified. Complete the record below.');
+      if (typeof response.product.estimatedUnitValue === 'number') {
+        setEstimatedUnitValue(response.product.estimatedUnitValue.toFixed(2));
+        setMessage('Item and estimated retail value found. Review the value before saving.');
+      } else {
+        setEstimatedUnitValue('');
+        setMessage('Product found, but no recent retail estimate was available. Enter the current value.');
+      }
     } catch (err) {
       setProduct(null);
       setMessage(err instanceof Error ? err.message : 'Could not identify that barcode.');
@@ -247,9 +253,24 @@ export default function CreateDonationRecordScreen() {
 
       {product ? (
         <View style={styles.card}>
-          <ThemedText type="smallBold">{product.name}</ThemedText>
-          <ThemedText type="small">Brand: {product.brand || 'Unknown'}</ThemedText>
+          <ThemedText type="smallBold">Product name</ThemedText>
+          <TextInput
+            style={styles.input}
+            value={product.name}
+            onChangeText={(name) => setProduct((current) => current ? { ...current, name } : current)}
+            placeholder="Product name"
+            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+          />
+          <ThemedText type="smallBold">Brand</ThemedText>
+          <TextInput
+            style={styles.input}
+            value={product.brand}
+            onChangeText={(brand) => setProduct((current) => current ? { ...current, brand } : current)}
+            placeholder="Brand name"
+            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+          />
           <ThemedText type="small">UPC: {product.upc}</ThemedText>
+          {product.priceSource ? <ThemedText type="small">Value source: {product.priceSource}</ThemedText> : null}
         </View>
       ) : null}
 

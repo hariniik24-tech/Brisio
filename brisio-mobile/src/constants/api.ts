@@ -52,6 +52,8 @@ export type ApiScannedProduct = {
   name: string;
   brand: string;
   category: string;
+  estimatedUnitValue?: number;
+  priceSource?: string;
 };
 
 export type ApiDonationRecord = {

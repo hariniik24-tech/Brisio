@@ -138,7 +138,8 @@ function ExploreContent() {
                   <ThemedView key={item.id} type="backgroundElement" style={styles.listingCard}>
                     <ThemedText type="smallBold">{item.businessName}</ThemedText>
                     <ThemedText type="small">
-                      {item.type === 'supply' ? 'Available resource' : 'Resource request'} | {item.category}
+                      {item.type === 'supply' ? 'Available resource' : 'Resource request'} |{' '}
+                      <ThemedText type="small" style={styles.categoryText}>{item.category}</ThemedText>
                     </ThemedText>
                     <ThemedText type="small">{item.description}</ThemedText>
                     <ThemedText type="small">{item.location || 'Location not set'}</ThemedText>
@@ -177,6 +178,9 @@ const styles = StyleSheet.create({
   },
   centerText: {
     textAlign: 'center',
+  },
+  categoryText: {
+    textTransform: 'capitalize',
   },
   panel: {
     marginHorizontal: Spacing.four,

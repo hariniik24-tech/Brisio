@@ -10,6 +10,10 @@ import { useSessionContext } from '@/context/session-context';
 
 const INPUT_PLACEHOLDER_COLOR = '#6A7685';
 
+function capitalizeWords(value: string) {
+  return value.replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
+}
+
 export default function CreateListingScreen() {
   const router = useRouter();
   const session = useSessionContext();
@@ -79,8 +83,9 @@ export default function CreateListingScreen() {
         style={styles.input}
         placeholder="Food, equipment, space, service..."
         placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+        autoCapitalize="words"
         value={category}
-        onChangeText={setCategory}
+        onChangeText={(value) => setCategory(capitalizeWords(value))}
       />
 
       <ThemedText type="smallBold">Description</ThemedText>

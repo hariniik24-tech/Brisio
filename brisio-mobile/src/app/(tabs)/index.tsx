@@ -11,6 +11,10 @@ import { useSessionContext } from '@/context/session-context';
 import { Link, useRouter } from 'expo-router';
 
 const INPUT_PLACEHOLDER_COLOR = '#6A7685';
+
+function capitalizeWords(value: string) {
+  return value.replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
+}
 const DONATION_SUMMARY_FALLBACK_MESSAGE = 'Donation metrics are temporarily unavailable. Please refresh shortly.';
 
 type DonationSummary = {
@@ -337,8 +341,9 @@ export default function HomeScreen() {
                             style={styles.input}
                             placeholder="Category"
                             placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+                            autoCapitalize="words"
                             value={editForm.category}
-                            onChangeText={(value) => setEditForm((previous) => ({ ...previous, category: value }))}
+                            onChangeText={(value) => setEditForm((previous) => ({ ...previous, category: capitalizeWords(value) }))}
                           />
                           <TextInput
                             accessibilityLabel="Listing description"
@@ -368,7 +373,7 @@ export default function HomeScreen() {
                         </>
                       ) : (
                         <>
-                          <ThemedText type="smallBold">{item.category}</ThemedText>
+                          <ThemedText type="smallBold" style={styles.categoryText}>{item.category}</ThemedText>
                           <ThemedText type="small">
                             {item.type === 'supply' ? 'Available resource' : 'Resource request'}
                           </ThemedText>
@@ -732,6 +737,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.two,
     marginTop: Spacing.one,
+  },
+  categoryText: {
+    textTransform: 'capitalize',
   },
   listingActionBtn: {
     flex: 1,

@@ -27,6 +27,7 @@ export default function CreateDonationRecordScreen() {
   const session = useSessionContext();
   const submittingRef = useRef(false);
   const scanHandledRef = useRef(false);
+  const scannerSubscriptionRef = useRef<ReturnType<typeof CameraView.onModernBarcodeScanned> | null>(null);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [barcode, setBarcode] = useState('');
   const [lookupBusy, setLookupBusy] = useState(false);
@@ -73,6 +74,11 @@ export default function CreateDonationRecordScreen() {
     };
   }, [session.token, session.user?.role]);
 
+  useEffect(() => () => {
+    scannerSubscriptionRef.current?.remove();
+    scannerSubscriptionRef.current = null;
+  }, []);
+
   async function runLookup(value: string) {
     if (!session.token) return;
     const cleanedBarcode = value.replace(/\D/g, '');
@@ -114,9 +120,11 @@ export default function CreateDonationRecordScreen() {
     setMessage('');
 
     if (Platform.OS !== 'web' && CameraView.isModernBarcodeScannerAvailable) {
-      const subscription = CameraView.onModernBarcodeScanned((result) => {
+      scannerSubscriptionRef.current?.remove();
+      scannerSubscriptionRef.current = CameraView.onModernBarcodeScanned((result) => {
         if (scanHandledRef.current) return;
-        subscription.remove();
+        scannerSubscriptionRef.current?.remove();
+        scannerSubscriptionRef.current = null;
         if (Platform.OS === 'ios') {
           void CameraView.dismissScanner();
         }
@@ -130,9 +138,9 @@ export default function CreateDonationRecordScreen() {
           isPinchToZoomEnabled: true,
         });
       } catch (err) {
+        scannerSubscriptionRef.current?.remove();
+        scannerSubscriptionRef.current = null;
         setMessage(err instanceof Error ? err.message : 'Could not start the barcode scanner.');
-      } finally {
-        subscription.remove();
       }
       return;
     }

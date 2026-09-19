@@ -73,12 +73,8 @@ You agree not to create listings that:
 - Violate these Terms
 Brisio may remove or restrict listings that violate these Terms or create safety, legal, or security concerns.
 
-5. User Communications
-Brisio may allow users to communicate through in-app messaging.
-
-You agree to use messaging features responsibly.
-
-You may not use Brisio messaging to:
+5. User Conduct
+You may not use Brisio to:
 - Harass, threaten, intimidate, or abuse another person
 - Send spam
 - Conduct fraud
@@ -91,7 +87,7 @@ You may not use Brisio messaging to:
 Brisio may investigate reports of abuse and take appropriate action.
 
 6. User-Generated Content
-You may submit content to Brisio, including listings, descriptions, messages, business information, and other materials ("User Content").
+You may submit content to Brisio, including listings, descriptions, business information, and other materials ("User Content").
 
 You retain ownership of User Content that you own.
 
@@ -193,7 +189,7 @@ Where appropriate, Brisio may provide notice before suspension or termination, b
 14. Account Deletion
 You may initiate deletion of your Brisio account through the account settings or other account-management functionality provided within the app.
 
-Deleting your account may result in the deletion of associated personal information, listings, messages, and other account-related content, subject to applicable legal, security, dispute-resolution, and retention requirements.
+Deleting your account may result in the deletion of associated personal information, listings, and other account-related content, subject to applicable legal, security, dispute-resolution, and retention requirements.
 
 Apple requires iOS applications that support account creation to provide users with a way to initiate account deletion within the app. Brisio maintains an in-app account deletion mechanism.
 

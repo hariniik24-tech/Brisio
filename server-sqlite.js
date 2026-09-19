@@ -27,27 +27,6 @@ db.exec(`
     updatedAt   TEXT NOT NULL
   );
 
-  CREATE TABLE IF NOT EXISTS engagements (
-    id              TEXT PRIMARY KEY,
-    listingId       TEXT NOT NULL,
-    listingOwnerId  TEXT NOT NULL,
-    requesterUserId TEXT NOT NULL,
-    status          TEXT NOT NULL CHECK(status IN ('requested','accepted','preparing','on_the_way','delivered','completed','declined','cancelled')),
-    createdAt       TEXT NOT NULL,
-    updatedAt       TEXT NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS engagement_messages (
-    id            TEXT PRIMARY KEY,
-    engagementId  TEXT NOT NULL,
-    senderUserId  TEXT NOT NULL,
-    senderName    TEXT NOT NULL,
-    body          TEXT NOT NULL,
-    etaNote       TEXT DEFAULT '',
-    locationNote  TEXT DEFAULT '',
-    createdAt     TEXT NOT NULL
-  );
-
   CREATE TABLE IF NOT EXISTS reports (
     id          TEXT PRIMARY KEY,
     listingId   TEXT DEFAULT '',
@@ -93,8 +72,6 @@ ensureColumn('listings', 'resourceName', 'TEXT DEFAULT \'\'');
 ensureColumn('listings', 'resourceType', 'TEXT DEFAULT \'\'');
 ensureColumn('listings', 'quantity', 'TEXT DEFAULT \'\'');
 ensureColumn('listings', 'availabilityNotes', 'TEXT DEFAULT \'\'');
-
-const ENGAGEMENT_STATUSES = ['requested', 'accepted', 'preparing', 'on_the_way', 'delivered', 'completed', 'declined', 'cancelled'];
 
 const existingCount = db.prepare('SELECT COUNT(*) AS c FROM listings').get().c;
 if (existingCount === 0) {
@@ -278,86 +255,6 @@ function isListingVisibleToUser(listing, user) {
 function getVisibleActiveListings(user) {
   const listings = db.prepare('SELECT * FROM listings WHERE active = 1 ORDER BY createdAt DESC').all();
   return listings.filter((listing) => isListingVisibleToUser(listing, user) && !isListingExpired(listing));
-}
-
-function canAccessEngagement(engagement, user) {
-  if (!engagement || !user) return false;
-  return engagement.listingOwnerId === user.id || engagement.requesterUserId === user.id;
-}
-
-function getEngagementById(id) {
-  return db.prepare(`
-    SELECT
-      e.*,
-      l.businessName,
-      l.category,
-      l.type,
-      l.description,
-      l.contact,
-      l.location,
-      l.deliverWithinHours,
-      l.offerClosesAt,
-      l.urgencyLevel,
-      l.isPrivate,
-      l.resourceName,
-      l.resourceType,
-      l.quantity,
-      l.availabilityNotes,
-      owner.displayName AS ownerDisplayName,
-      owner.organizationName AS ownerOrganizationName,
-      requester.displayName AS requesterDisplayName,
-      requester.organizationName AS requesterOrganizationName
-    FROM engagements e
-    JOIN listings l ON l.id = e.listingId
-    JOIN users owner ON owner.id = e.listingOwnerId
-    JOIN users requester ON requester.id = e.requesterUserId
-    WHERE e.id = ?
-  `).get(id);
-}
-
-function getEngagementMessages(engagementId) {
-  return db.prepare(`
-    SELECT id, engagementId, senderUserId, senderName, body, etaNote, locationNote, createdAt
-    FROM engagement_messages
-    WHERE engagementId = ?
-    ORDER BY createdAt ASC
-  `).all(engagementId);
-}
-
-function getEngagementsForUser(user) {
-  const rows = db.prepare(`
-    SELECT
-      e.*,
-      l.businessName,
-      l.category,
-      l.type,
-      l.description,
-      l.contact,
-      l.location,
-      l.deliverWithinHours,
-      l.offerClosesAt,
-      l.urgencyLevel,
-      l.isPrivate,
-      l.resourceName,
-      l.resourceType,
-      l.quantity,
-      l.availabilityNotes,
-      owner.displayName AS ownerDisplayName,
-      owner.organizationName AS ownerOrganizationName,
-      requester.displayName AS requesterDisplayName,
-      requester.organizationName AS requesterOrganizationName
-    FROM engagements e
-    JOIN listings l ON l.id = e.listingId
-    JOIN users owner ON owner.id = e.listingOwnerId
-    JOIN users requester ON requester.id = e.requesterUserId
-    WHERE e.listingOwnerId = ? OR e.requesterUserId = ?
-    ORDER BY e.updatedAt DESC
-  `).all(user.id, user.id);
-
-  return rows.map((row) => ({
-    ...row,
-    messages: getEngagementMessages(row.id)
-  }));
 }
 
 function tokenize(text) {
@@ -944,18 +841,8 @@ app.delete('/api/auth/account', requireAuth, (req, res) => {
   }
 
   const userListings = db.prepare('SELECT id FROM listings WHERE ownerUserId = ?').all(userId).map((row) => row.id);
-  const engagementIds = db.prepare(
-    'SELECT id FROM engagements WHERE listingOwnerId = ? OR requesterUserId = ?'
-  ).all(userId, userId).map((row) => row.id);
-
   const deleteAccount = db.transaction(() => {
     db.prepare('DELETE FROM sessions WHERE userId = ?').run(userId);
-
-    if (engagementIds.length > 0) {
-      const engagementPlaceholders = engagementIds.map(() => '?').join(', ');
-      db.prepare(`DELETE FROM engagement_messages WHERE engagementId IN (${engagementPlaceholders})`).run(...engagementIds);
-      db.prepare(`DELETE FROM engagements WHERE id IN (${engagementPlaceholders})`).run(...engagementIds);
-    }
 
     if (userListings.length > 0) {
       const listingPlaceholders = userListings.map(() => '?').join(', ');
@@ -1196,115 +1083,6 @@ app.patch('/api/listings/:id', requireAuth, (req, res) => {
   db.prepare(`UPDATE listings SET ${sets} WHERE id = ?`).run(...Object.values(updates), req.params.id);
   const updated = db.prepare('SELECT * FROM listings WHERE id = ?').get(req.params.id);
   res.json({ success: true, listing: updated });
-});
-
-app.get('/api/engagements', requireAuth, (req, res) => {
-  const engagements = getEngagementsForUser(req.user);
-  res.json({ success: true, engagements });
-});
-
-app.post('/api/listings/:id/requests', requireAuth, (req, res) => {
-  if (req.user.role !== 'organization') {
-    return res.status(403).json({ success: false, error: 'Only organization accounts can request a business listing' });
-  }
-  const listing = db.prepare('SELECT * FROM listings WHERE id = ?').get(req.params.id);
-  if (!listing) return res.status(404).json({ success: false, error: 'Listing not found' });
-  if (listing.type !== 'supply') {
-    return res.status(400).json({ success: false, error: 'Only supply listings can be requested' });
-  }
-  if (!isListingVisibleToUser(listing, req.user)) {
-    return res.status(403).json({ success: false, error: 'You cannot access this private listing' });
-  }
-  if (listing.ownerUserId === req.user.id) {
-    return res.status(400).json({ success: false, error: 'You cannot request your own listing' });
-  }
-
-  const existing = db.prepare(`
-    SELECT id, status
-    FROM engagements
-    WHERE listingId = ? AND requesterUserId = ? AND status NOT IN ('declined', 'cancelled', 'completed')
-  `).get(listing.id, req.user.id);
-  if (existing) {
-    const engagement = getEngagementById(existing.id);
-    return res.status(409).json({ success: false, error: 'You already have an active request for this listing', engagement });
-  }
-
-  const note = String(req.body.message || '').trim();
-  const id = crypto.randomUUID();
-  const now = new Date().toISOString();
-  db.prepare(`
-    INSERT INTO engagements (id, listingId, listingOwnerId, requesterUserId, status, createdAt, updatedAt)
-    VALUES (?, ?, ?, ?, 'requested', ?, ?)
-  `).run(id, listing.id, listing.ownerUserId || '', req.user.id, now, now);
-
-  const initialMessage = note || `We'd like to request this ${listing.category} listing.`;
-  db.prepare(`
-    INSERT INTO engagement_messages (id, engagementId, senderUserId, senderName, body, etaNote, locationNote, createdAt)
-    VALUES (?, ?, ?, ?, ?, '', '', ?)
-  `).run(crypto.randomUUID(), id, req.user.id, req.user.organizationName || req.user.displayName, initialMessage, now);
-
-  const engagement = getEngagementById(id);
-  res.status(201).json({ success: true, engagement: { ...engagement, messages: getEngagementMessages(id) } });
-});
-
-app.patch('/api/engagements/:id/status', requireAuth, (req, res) => {
-  const engagement = getEngagementById(req.params.id);
-  if (!engagement) return res.status(404).json({ success: false, error: 'Engagement not found' });
-  if (!canAccessEngagement(engagement, req.user)) {
-    return res.status(403).json({ success: false, error: 'You cannot update this engagement' });
-  }
-
-  const nextStatus = String(req.body.status || '').trim();
-  if (!ENGAGEMENT_STATUSES.includes(nextStatus)) {
-    return res.status(400).json({ success: false, error: `status must be one of: ${ENGAGEMENT_STATUSES.join(', ')}` });
-  }
-
-  db.prepare('UPDATE engagements SET status = ?, updatedAt = ? WHERE id = ?').run(nextStatus, new Date().toISOString(), engagement.id);
-
-  if (req.body.note) {
-    db.prepare(`
-      INSERT INTO engagement_messages (id, engagementId, senderUserId, senderName, body, etaNote, locationNote, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      crypto.randomUUID(),
-      engagement.id,
-      req.user.id,
-      req.user.organizationName || req.user.displayName,
-      String(req.body.note).trim(),
-      String(req.body.etaNote || '').trim(),
-      String(req.body.locationNote || '').trim(),
-      new Date().toISOString()
-    );
-  }
-
-  const updated = getEngagementById(engagement.id);
-  res.json({ success: true, engagement: { ...updated, messages: getEngagementMessages(engagement.id) } });
-});
-
-app.post('/api/engagements/:id/messages', requireAuth, (req, res) => {
-  const engagement = getEngagementById(req.params.id);
-  if (!engagement) return res.status(404).json({ success: false, error: 'Engagement not found' });
-  if (!canAccessEngagement(engagement, req.user)) {
-    return res.status(403).json({ success: false, error: 'You cannot message on this engagement' });
-  }
-
-  const body = String(req.body.message || '').trim();
-  const etaNote = String(req.body.etaNote || '').trim();
-  const locationNote = String(req.body.locationNote || '').trim();
-  if (!body) {
-    return res.status(400).json({ success: false, error: 'message is required' });
-  }
-
-  const id = crypto.randomUUID();
-  const now = new Date().toISOString();
-  db.prepare(`
-    INSERT INTO engagement_messages (id, engagementId, senderUserId, senderName, body, etaNote, locationNote, createdAt)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, engagement.id, req.user.id, req.user.organizationName || req.user.displayName, body, etaNote, locationNote, now);
-  db.prepare('UPDATE engagements SET updatedAt = ? WHERE id = ?').run(now, engagement.id);
-
-  const message = db.prepare('SELECT * FROM engagement_messages WHERE id = ?').get(id);
-  res.status(201).json({ success: true, message, engagement: { ...getEngagementById(engagement.id), messages: getEngagementMessages(engagement.id) } });
 });
 
 app.delete('/api/listings/:id', requireAuth, (req, res) => {

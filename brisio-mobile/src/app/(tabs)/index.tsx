@@ -374,18 +374,18 @@ export default function HomeScreen() {
                           </ThemedText>
                           <ThemedText type="small">{item.description}</ThemedText>
                           <ThemedText type="small">{item.location}</ThemedText>
-                          <View style={styles.modeRow}>
+                          <View style={styles.listingActionRow}>
                             <Pressable
                               accessibilityRole="button"
                               accessibilityLabel={`Edit ${item.category} listing`}
-                              style={styles.secondaryBtn}
+                              style={[styles.secondaryBtn, styles.listingActionBtn]}
                               onPress={() => beginEditListing(item)}>
                               <ThemedText type="smallBold">Edit</ThemedText>
                             </Pressable>
                             <Pressable
                               accessibilityRole="button"
                               accessibilityLabel={`Delete ${item.category} listing`}
-                              style={[styles.deleteListingBtn, deletingListingId === item.id && styles.disabledBtn]}
+                              style={[styles.deleteListingBtn, styles.listingActionBtn, deletingListingId === item.id && styles.disabledBtn]}
                               onPress={() => confirmDeleteListing(item)}
                               disabled={Boolean(deletingListingId)}>
                               <ThemedText type="smallBold" style={styles.deleteListingText}>
@@ -728,9 +728,17 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
     backgroundColor: '#FBFCFE',
   },
-  deleteListingBtn: {
-    width: '100%',
+  listingActionRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
     marginTop: Spacing.one,
+  },
+  listingActionBtn: {
+    flex: 1,
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  deleteListingBtn: {
     borderWidth: 1,
     borderColor: '#C94A43',
     borderRadius: Spacing.two,

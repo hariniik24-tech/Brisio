@@ -23,36 +23,6 @@ export type ApiListing = {
   createdAt: string;
 };
 
-export type ApiEngagementMessage = {
-  id: string;
-  engagementId: string;
-  senderUserId: string;
-  senderName: string;
-  body: string;
-  etaNote?: string;
-  locationNote?: string;
-  createdAt: string;
-};
-
-export type ApiEngagement = {
-  id: string;
-  listingId: string;
-  listingOwnerId: string;
-  requesterUserId: string;
-  status: 'requested' | 'accepted' | 'preparing' | 'on_the_way' | 'delivered' | 'completed' | 'declined' | 'cancelled';
-  createdAt: string;
-  updatedAt: string;
-  businessName?: string;
-  category?: string;
-  description?: string;
-  location?: string;
-  ownerDisplayName?: string;
-  ownerOrganizationName?: string;
-  requesterDisplayName?: string;
-  requesterOrganizationName?: string;
-  messages: ApiEngagementMessage[];
-};
-
 export type ApiReport = {
   id: string;
   listingId: string;
@@ -97,6 +67,7 @@ export type ApiDonation = {
   status: ApiDonationStatus;
   donorOrgId: string;
   recipientOrgId: string;
+  recipientName?: string;
   productName: string;
   productBrand: string;
   productCategory: string;
@@ -105,6 +76,7 @@ export type ApiDonation = {
   quantity: number;
   unit: string;
   conditionNotes: string;
+  estimatedTotalValue?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -340,41 +312,6 @@ export async function deleteListing(token: string, listingId: string) {
   });
 }
 
-export async function getEngagements(token: string) {
-  return apiRequest<{ success: true; engagements: ApiEngagement[] }>('/api/engagements', { token });
-}
-
-export async function requestListingEngagement(token: string, listingId: string) {
-  return apiRequest<{ success: true; engagementId: string }>(`/api/listings/${encodeURIComponent(listingId)}/requests`, {
-    method: 'POST',
-    token,
-  });
-}
-
-export async function updateEngagementStatus(
-  token: string,
-  engagementId: string,
-  status: 'accepted' | 'declined' | 'cancelled'
-) {
-  return apiRequest<{ success: true }>(`/api/engagements/${encodeURIComponent(engagementId)}/status`, {
-    method: 'PATCH',
-    token,
-    body: { status },
-  });
-}
-
-export async function sendEngagementMessage(
-  token: string,
-  engagementId: string,
-  input: { body: string; etaNote?: string; locationNote?: string }
-) {
-  return apiRequest<{ success: true; messageId: string }>(`/api/engagements/${encodeURIComponent(engagementId)}/messages`, {
-    method: 'POST',
-    token,
-    body: input,
-  });
-}
-
 export async function lookupProductByBarcode(token: string, input: { barcode: string; format?: string }) {
   return apiRequest<{ success: true; product: ApiScannedProduct; source: string }>('/api/products/lookup', {
     method: 'POST',
@@ -385,6 +322,12 @@ export async function lookupProductByBarcode(token: string, input: { barcode: st
 
 export async function getOrganizations(token: string) {
   return apiRequest<{ success: true; organizations: ApiOrganization[] }>('/api/organizations', {
+    token,
+  });
+}
+
+export async function getDonationRecipients(token: string) {
+  return apiRequest<{ success: true; organizations: ApiOrganization[] }>('/api/donation-recipients', {
     token,
   });
 }

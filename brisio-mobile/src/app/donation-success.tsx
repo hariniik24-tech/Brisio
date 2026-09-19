@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Link, useLocalSearchParams } from 'expo-router';
+import { Href, Link, useLocalSearchParams } from 'expo-router';
 
 import { StackScreenShell } from '@/components/stack-screen-shell';
 import { ThemedText } from '@/components/themed-text';
@@ -20,7 +20,7 @@ export default function DonationSuccessScreen() {
         <ThemedText type="small">Status: posted</ThemedText>
       </View>
 
-      <Link href="/donate-inventory" asChild>
+      <Link href={'/create-donation-record' as Href} asChild>
         <Pressable style={styles.primaryBtn}>
           <ThemedText type="smallBold">Create another donation</ThemedText>
         </Pressable>

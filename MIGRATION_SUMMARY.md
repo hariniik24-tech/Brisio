@@ -13,7 +13,7 @@
 
 ### 3. Database Schema
 - ✅ Created `db-schema.sql` - SQL migration file
-- ✅ Includes all tables: listings, engagements, engagement_messages, reports, users, sessions
+- ✅ Includes all current tables for listings, reports, users, sessions, password resets, and donations
 - ✅ Includes optimized indexes for performance
 
 ### 4. Server Migration
@@ -25,7 +25,6 @@
 ### 5. API Endpoints (All Converted)
 - ✅ Authentication: register, login, logout, delete account, me
 - ✅ Listings: create, read, update, delete, list
-- ✅ Engagements: create, list, update status, add messages
 - ✅ Search & Matching: personalized recommendations, AI insights
 - ✅ Statistics: dashboard stats endpoints
 

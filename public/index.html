@@ -563,20 +563,6 @@
       font-weight: 700;
       text-transform: capitalize;
     }
-    .message-thread {
-      display: grid;
-      gap: 8px;
-      margin: 10px 0;
-      max-height: 260px;
-      overflow-y: auto;
-    }
-    .message-bubble {
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      background: #f8fbff;
-      padding: 10px 12px;
-    }
-
     .inline-actions {
       display: flex;
       flex-wrap: wrap;
@@ -679,7 +665,6 @@
       .screen-chip,
       .listing,
       .detail-box,
-      .message-bubble,
       .chat-log,
       .stat-tile,
       .listing-detail .detail-box,
@@ -769,7 +754,6 @@
       stats: null,
       organizations: [],
       aiInsights: null,
-      engagements: [],
       bestMatch: null,
       view: 'loading',
       dashboardSection: 'overview',
@@ -824,16 +808,14 @@
     }
 
     async function refreshData() {
-      const [listingsRes, statsRes, insightsRes, engagementsRes] = await Promise.all([
+      const [listingsRes, statsRes, insightsRes] = await Promise.all([
         api('/api/listings'),
         api('/api/stats'),
-        api('/api/ai-insights'),
-        api('/api/engagements')
+        api('/api/ai-insights')
       ]);
       state.listings = listingsRes.listings || [];
       state.stats = statsRes.stats || null;
       state.aiInsights = insightsRes.insights || null;
-      state.engagements = engagementsRes.engagements || [];
       if (!state.selectedListingId || !state.listings.some((listing) => listing.id === state.selectedListingId)) {
         state.selectedListingId = state.listings[0] ? state.listings[0].id : '';
       }
@@ -860,7 +842,6 @@
       state.listings = [];
       state.stats = null;
       state.aiInsights = null;
-      state.engagements = [];
       state.organizations = [];
       state.bestMatch = null;
       state.dashboardSection = 'overview';
@@ -1202,8 +1183,8 @@
     function setDashboardSection(section) {
       const role = state.user && state.user.role ? state.user.role : 'organization';
       const allowed = role === 'business'
-        ? new Set(['overview', 'post', 'board', 'activity', 'ai'])
-        : new Set(['overview', 'board', 'match', 'activity', 'ai']);
+        ? new Set(['overview', 'post', 'board', 'ai'])
+        : new Set(['overview', 'board', 'match', 'ai']);
       state.dashboardSection = allowed.has(section) ? section : 'overview';
       render();
     }
@@ -1240,64 +1221,8 @@
       return boardListings.find((item) => item.id === state.selectedListingId) || boardListings[0] || null;
     }
 
-    function getActiveEngagementForListing(listingId) {
-      return state.engagements.find((engagement) => engagement.listingId === listingId && !['declined', 'cancelled', 'completed'].includes(engagement.status));
-    }
-
-    async function requestListing(listingId) {
-      const noteEl = document.getElementById(`requestMessage-${listingId}`);
-      const message = noteEl ? noteEl.value.trim() : '';
-      const res = await api(`/api/listings/${listingId}/requests`, {
-        method: 'POST',
-        body: JSON.stringify({ message })
-      });
-      if (!res.success) return setMessage(res.error || 'Could not send request.');
-      await refreshData();
-      setMessage('Request sent to the business. You can keep coordinating below.');
-    }
-
-    async function updateEngagementStatus(engagementId, status) {
-      const noteEl = document.getElementById(`engagementStatusNote-${engagementId}`);
-      const etaEl = document.getElementById(`engagementEta-${engagementId}`);
-      const locationEl = document.getElementById(`engagementLocation-${engagementId}`);
-      const res = await api(`/api/engagements/${engagementId}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          status,
-          note: noteEl ? noteEl.value.trim() : '',
-          etaNote: etaEl ? etaEl.value.trim() : '',
-          locationNote: locationEl ? locationEl.value.trim() : ''
-        })
-      });
-      if (!res.success) return setMessage(res.error || 'Could not update engagement status.');
-      await refreshData();
-      setMessage(`Status updated to ${status.replace(/_/g, ' ')}.`);
-    }
-
-    async function sendEngagementMessage(engagementId) {
-      const messageEl = document.getElementById(`engagementMessage-${engagementId}`);
-      const etaEl = document.getElementById(`engagementEta-${engagementId}`);
-      const locationEl = document.getElementById(`engagementLocation-${engagementId}`);
-      const message = messageEl ? messageEl.value.trim() : '';
-      if (!message) return setMessage('Write a message first.');
-
-      const res = await api(`/api/engagements/${engagementId}/messages`, {
-        method: 'POST',
-        body: JSON.stringify({
-          message,
-          etaNote: etaEl ? etaEl.value.trim() : '',
-          locationNote: locationEl ? locationEl.value.trim() : ''
-        })
-      });
-      if (!res.success) return setMessage(res.error || 'Could not send message.');
-      await refreshData();
-      setMessage('Update sent.');
-    }
-
     function renderListing(item) {
       const privateChip = item.isPrivate === 1 ? '<span class="badge private">Private offer</span>' : '';
-      const engagement = getActiveEngagementForListing(item.id);
-      const canRequest = state.user && state.user.role === 'organization' && item.type === 'supply' && item.ownerUserId && item.ownerUserId !== state.user.id;
       const cardClass = state.selectedListingId === item.id ? 'listing active' : 'listing';
       return `
         <div class="${cardClass}" onclick="selectListing('${item.id}')">
@@ -1319,8 +1244,6 @@
         return '<div class="listing-detail"><strong>No listing selected</strong><div class="small muted">Click any offer or request to inspect the full record.</div></div>';
       }
 
-      const engagement = getActiveEngagementForListing(item.id);
-      const canRequest = state.user && state.user.role === 'organization' && item.type === 'supply' && item.ownerUserId && item.ownerUserId !== state.user.id;
       const details = [
         ['Business / nonprofit', item.businessName],
         ['Category', item.category],
@@ -1336,15 +1259,6 @@
       ];
       if (item.urgencyLevel && item.urgencyLevel !== 'normal') details.push(['Urgency', item.urgencyLevel]);
 
-      const requestArea = canRequest
-        ? engagement
-          ? `<div class="small muted">Request status: <span class="status-badge">${escapeHtml(engagement.status.replace(/_/g, ' '))}</span></div>`
-          : `
-            <div class="field"><label>Message to business</label><textarea class="textarea-sm" id="requestMessage-${item.id}" placeholder="We can use this listing and would like to coordinate pickup or arrival."></textarea></div>
-            <div class="inline-actions"><button class="btn" onclick="requestListing('${item.id}')">Request this listing</button></div>
-          `
-        : '';
-
       return `
         <div class="listing-detail">
           <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start;">
@@ -1355,99 +1269,14 @@
             <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;align-items:center;">
               <span class="badge">${item.type === 'supply' ? 'Offer' : 'Request'}</span>
               ${item.isPrivate === 1 ? '<span class="badge private">Private offer</span>' : ''}
-              ${engagement ? `<span class="status-badge">${escapeHtml(engagement.status.replace(/_/g, ' '))}</span>` : ''}
             </div>
           </div>
           <div>${escapeHtml(item.description)}</div>
           <div class="detail-grid">
             ${details.map(([label, value]) => `<div class="detail-box"><div class="small muted">${escapeHtml(label)}</div><div>${escapeHtml(value)}</div></div>`).join('')}
           </div>
-          ${requestArea}
         </div>
       `;
-    }
-
-    function renderEngagementActions(engagement) {
-      const isBusiness = state.user.id === engagement.listingOwnerId;
-      const buttons = [];
-
-      if (isBusiness && engagement.status === 'requested') {
-        buttons.push(`<button class="btn" onclick="updateEngagementStatus('${engagement.id}', 'accepted')">Accept request</button>`);
-        buttons.push(`<button class="btn-alt" onclick="updateEngagementStatus('${engagement.id}', 'declined')">Decline</button>`);
-      }
-      if (isBusiness && ['accepted', 'preparing'].includes(engagement.status)) {
-        buttons.push(`<button class="btn" onclick="updateEngagementStatus('${engagement.id}', 'preparing')">Preparing</button>`);
-        buttons.push(`<button class="btn" onclick="updateEngagementStatus('${engagement.id}', 'on_the_way')">On the way</button>`);
-      }
-      if (isBusiness && engagement.status === 'on_the_way') {
-        buttons.push(`<button class="btn" onclick="updateEngagementStatus('${engagement.id}', 'delivered')">Mark delivered</button>`);
-      }
-      if (!isBusiness && ['requested', 'accepted', 'preparing', 'on_the_way'].includes(engagement.status)) {
-        buttons.push(`<button class="btn-alt" onclick="updateEngagementStatus('${engagement.id}', 'cancelled')">Cancel request</button>`);
-      }
-      if (!isBusiness && engagement.status === 'delivered') {
-        buttons.push(`<button class="btn" onclick="updateEngagementStatus('${engagement.id}', 'completed')">Confirm received</button>`);
-      }
-
-      return buttons.length ? `<div class="inline-actions">${buttons.join('')}</div>` : '';
-    }
-
-    function renderEngagements() {
-      if (!state.engagements.length) {
-        return '<div class="muted">No active coordination threads yet. Once a nonprofit requests a listing, the full conversation and status timeline will stay here.</div>';
-      }
-
-      return state.engagements.map((engagement) => {
-        const counterpart = state.user.id === engagement.listingOwnerId
-          ? (engagement.requesterOrganizationName || engagement.requesterDisplayName)
-          : (engagement.ownerOrganizationName || engagement.ownerDisplayName);
-        const messages = (engagement.messages || []).map((message) => `
-          <div class="message-bubble">
-            <div class="small muted">${escapeHtml(message.senderName)} - ${new Date(message.createdAt).toLocaleString()}</div>
-            <div>${escapeHtml(message.body)}</div>
-            ${message.etaNote ? `<div class="small muted">ETA: ${escapeHtml(message.etaNote)}</div>` : ''}
-            ${message.locationNote ? `<div class="small muted">Location update: ${escapeHtml(message.locationNote)}</div>` : ''}
-          </div>
-        `).join('');
-
-        return `
-          <div class="listing">
-            <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start;">
-              <div>
-                <strong>${escapeHtml(engagement.businessName)}</strong>
-                <div class="small muted">Coordinating with ${escapeHtml(counterpart || 'the other side')}</div>
-                <div class="small muted"><strong>You are chatting with:</strong> ${escapeHtml(counterpart || 'the other side')}</div>
-              </div>
-              <span class="status-badge">${escapeHtml(engagement.status.replace(/_/g, ' '))}</span>
-            </div>
-            <div>${escapeHtml(engagement.description)}</div>
-            <div class="detail-grid">
-              <div class="detail-box"><div class="small muted">Category</div><div>${escapeHtml(engagement.category)}</div></div>
-              <div class="detail-box"><div class="small muted">Resource name</div><div>${escapeHtml(engagement.resourceName || 'Not specified')}</div></div>
-              <div class="detail-box"><div class="small muted">Type</div><div>${escapeHtml(engagement.resourceType || 'Not specified')}</div></div>
-              <div class="detail-box"><div class="small muted">Quantity / capacity</div><div>${escapeHtml(engagement.quantity || 'Not specified')}</div></div>
-              <div class="detail-box"><div class="small muted">Location</div><div>${escapeHtml(engagement.location || 'Not specified')}</div></div>
-              <div class="detail-box"><div class="small muted">Expiration</div><div>${escapeHtml(engagement.offerClosesAt ? new Date(engagement.offerClosesAt).toLocaleString() : 'Not specified')}</div></div>
-              <div class="detail-box"><div class="small muted">Delivery ETA</div><div>${escapeHtml(engagement.deliverWithinHours ? `${engagement.deliverWithinHours} hours` : 'Not specified')}</div></div>
-              <div class="detail-box"><div class="small muted">Contact</div><div>${escapeHtml(engagement.contact || 'Not specified')}</div></div>
-            </div>
-            <div class="small muted">Availability notes: ${escapeHtml(engagement.availabilityNotes || 'Not specified')}</div>
-            <div class="message-thread">${messages}</div>
-            <div class="row two">
-              <div class="field"><label>New update</label><textarea class="textarea-sm" id="engagementMessage-${engagement.id}" placeholder="Confirm pickup timing, arrival details, food type, room access, equipment handoff, or any follow-up."></textarea></div>
-              <div class="row">
-                <div class="field"><label>ETA / timing</label><input id="engagementEta-${engagement.id}" placeholder="Arriving at 3:15 PM" /></div>
-                <div class="field"><label>Location update</label><input id="engagementLocation-${engagement.id}" placeholder="Front entrance on Oak Street" /></div>
-                <div class="field"><label>Status note</label><input id="engagementStatusNote-${engagement.id}" placeholder="Optional note when changing status" /></div>
-              </div>
-            </div>
-            <div class="inline-actions">
-              <button class="btn" onclick="sendEngagementMessage('${engagement.id}')">Send update</button>
-            </div>
-            ${renderEngagementActions(engagement)}
-          </div>
-        `;
-      }).join('');
     }
 
     function renderBestMatchResult() {
@@ -1492,14 +1321,12 @@
             ['overview', 'Overview'],
             ['post', 'Post offer'],
             ['board', 'Live board'],
-            ['ai', 'AI assistant'],
-            ['activity', 'Coordination chat']
+            ['ai', 'AI assistant']
           ]
         : [
             ['overview', 'Overview'],
             ['ai', 'AI assistant'],
-            ['board', 'Explore board'],
-            ['activity', 'Coordination chat']
+            ['board', 'Explore board']
           ];
 
       return `
@@ -1539,11 +1366,6 @@
                 </div>
                 <div class="step-card">
                   ${nonprofitStepTwo}
-                </div>
-                <div class="step-card">
-                  <strong>3. Keep coordination in one place</strong>
-                  <div class="small muted">Requests, acceptances, delivery timing, and messages stay together.</div>
-                  <div class="inline-actions"><button class="btn-alt" onclick="setDashboardSection('activity')">Open coordination screen</button></div>
                 </div>
               </div>
               <div class="quick-panel">
@@ -1594,7 +1416,7 @@
           <div class="hero-kpis">
             <div class="kpi-chip"><strong>AI-guided</strong><div class="small muted">Best-fit suggestions from live listings</div></div>
             <div class="kpi-chip"><strong>Role-based</strong><div class="small muted">Business and nonprofit flows stay distinct</div></div>
-            <div class="kpi-chip"><strong>Traceable</strong><div class="small muted">Status, messaging, and handoff in one place</div></div>
+            <div class="kpi-chip"><strong>Traceable</strong><div class="small muted">Listings, donation records, and handoffs in one place</div></div>
           </div>
           <div class="hero-actions">
             <span class="badge">Professional dashboard</span>
@@ -1761,14 +1583,6 @@
             </div>
           </div>
         `;
-      } else if (state.dashboardSection === 'activity') {
-        sectionContent = `
-          <div class="card">
-            <h3>Coordination chat</h3>
-            <p class="small muted">Yes, this is the live thread with the person or organization you are working with, plus status updates like requested, accepted, on the way, and delivered.</p>
-            ${renderEngagements()}
-          </div>
-        `;
       } else if (state.dashboardSection === 'ai') {
         sectionContent = `
           <div class="card">
@@ -1840,9 +1654,6 @@
     window.runQuickRecommend = runQuickRecommend;
     window.runGeneralAI = runGeneralAI;
     window.runClassicMatchSearch = runClassicMatchSearch;
-    window.requestListing = requestListing;
-    window.updateEngagementStatus = updateEngagementStatus;
-    window.sendEngagementMessage = sendEngagementMessage;
     window.sendChat = sendChat;
     window.sendPresetChat = sendPresetChat;
     window.handleChatAction = handleChatAction;

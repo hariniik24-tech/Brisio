@@ -26,29 +26,6 @@ CREATE TABLE IF NOT EXISTS listings (
   updatedAt TEXT NOT NULL
 );
 
--- Create engagements table
-CREATE TABLE IF NOT EXISTS engagements (
-  id TEXT PRIMARY KEY,
-  listingId TEXT NOT NULL,
-  listingOwnerId TEXT NOT NULL,
-  requesterUserId TEXT NOT NULL,
-  status TEXT NOT NULL CHECK(status IN ('requested','accepted','preparing','on_the_way','delivered','completed','declined','cancelled')),
-  createdAt TEXT NOT NULL,
-  updatedAt TEXT NOT NULL
-);
-
--- Create engagement_messages table
-CREATE TABLE IF NOT EXISTS engagement_messages (
-  id TEXT PRIMARY KEY,
-  engagementId TEXT NOT NULL,
-  senderUserId TEXT NOT NULL,
-  senderName TEXT NOT NULL,
-  body TEXT NOT NULL,
-  etaNote TEXT DEFAULT '',
-  locationNote TEXT DEFAULT '',
-  createdAt TEXT NOT NULL
-);
-
 -- Create reports table
 CREATE TABLE IF NOT EXISTS reports (
   id TEXT PRIMARY KEY,
@@ -106,10 +83,6 @@ CREATE INDEX IF NOT EXISTS idx_listings_type ON listings(type);
 CREATE INDEX IF NOT EXISTS idx_listings_category ON listings(category);
 CREATE INDEX IF NOT EXISTS idx_listings_active ON listings(active);
 CREATE INDEX IF NOT EXISTS idx_listings_ownerUserId ON listings(ownerUserId);
-CREATE INDEX IF NOT EXISTS idx_engagements_listingId ON engagements(listingId);
-CREATE INDEX IF NOT EXISTS idx_engagements_requesterUserId ON engagements(requesterUserId);
-CREATE INDEX IF NOT EXISTS idx_engagements_listingOwnerId ON engagements(listingOwnerId);
-CREATE INDEX IF NOT EXISTS idx_engagement_messages_engagementId ON engagement_messages(engagementId);
 CREATE INDEX IF NOT EXISTS idx_sessions_userId ON sessions(userId);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_blocks_blockerUserId ON blocks(blockerUserId);
@@ -230,8 +203,6 @@ CREATE INDEX IF NOT EXISTS idx_donation_handoffs_donation_compat ON donation_han
 -- All mobile access passes through the trusted Render API. The service_role key
 -- bypasses RLS; anon and authenticated clients receive no direct table access.
 ALTER TABLE listings ENABLE ROW LEVEL SECURITY;
-ALTER TABLE engagements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE engagement_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE blocks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE password_reset_tokens ENABLE ROW LEVEL SECURITY;
@@ -241,6 +212,6 @@ ALTER TABLE donation_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE donation_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE donation_handoffs ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE listings, engagements, engagement_messages, reports, blocks,
+REVOKE ALL ON TABLE listings, reports, blocks,
   password_reset_tokens, users, sessions, donation_records, donation_events,
   donation_handoffs FROM anon, authenticated;

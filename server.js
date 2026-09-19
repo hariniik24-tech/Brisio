@@ -84,8 +84,6 @@ async function verifySupabaseSchema() {
     'users',
     'sessions',
     'listings',
-    'engagements',
-    'engagement_messages',
     'reports',
     'blocks',
     'password_reset_tokens',
@@ -674,136 +672,6 @@ async function getBlockedUsersForUser(userId) {
 
   if (error) throw error;
   return data || [];
-}
-
-function canAccessEngagement(engagement, user) {
-  if (!engagement || !user) return false;
-  const listingOwnerId = getFirstDefined(engagement, ['listingOwnerId', 'listingownerid']);
-  const requesterUserId = getFirstDefined(engagement, ['requesterUserId', 'requesteruserid']);
-  return listingOwnerId === user.id || requesterUserId === user.id;
-}
-
-function normalizeEngagementRow(row) {
-  if (!row) return null;
-  return {
-    ...row,
-    listingId: getFirstDefined(row, ['listingId', 'listingid']),
-    listingOwnerId: getFirstDefined(row, ['listingOwnerId', 'listingownerid']),
-    requesterUserId: getFirstDefined(row, ['requesterUserId', 'requesteruserid']),
-    createdAt: getFirstDefined(row, ['createdAt', 'createdat']),
-    updatedAt: getFirstDefined(row, ['updatedAt', 'updatedat']),
-  };
-}
-
-function flattenEngagement(engagement, listing, owner, requester, messages = []) {
-  return {
-    ...engagement,
-    businessName: getFirstDefined(listing, ['businessName', 'businessname']),
-    category: getFirstDefined(listing, ['category']),
-    type: getFirstDefined(listing, ['type']),
-    description: getFirstDefined(listing, ['description']),
-    contact: getFirstDefined(listing, ['contact']),
-    location: publicLocation(getFirstDefined(listing, ['location'])),
-    deliverWithinHours: getFirstDefined(listing, ['deliverWithinHours', 'deliverwithinhours']),
-    offerClosesAt: getFirstDefined(listing, ['offerClosesAt', 'offerclosesat']),
-    urgencyLevel: getFirstDefined(listing, ['urgencyLevel', 'urgencylevel']),
-    isPrivate: getFirstDefined(listing, ['isPrivate', 'isprivate']),
-    resourceName: getFirstDefined(listing, ['resourceName', 'resourcename']),
-    resourceType: getFirstDefined(listing, ['resourceType', 'resourcetype']),
-    quantity: getFirstDefined(listing, ['quantity']),
-    availabilityNotes: getFirstDefined(listing, ['availabilityNotes', 'availabilitynotes']),
-    ownerDisplayName: owner?.displayName,
-    ownerOrganizationName: owner?.organizationName,
-    requesterDisplayName: requester?.displayName,
-    requesterOrganizationName: requester?.organizationName,
-    messages,
-  };
-}
-
-async function getEngagementById(id) {
-  const { data: row, error } = await supabase
-    .from('engagements')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error || !row) return null;
-
-  const engagement = normalizeEngagementRow(row);
-  const [{ data: listing }, { data: userRows }] = await Promise.all([
-    supabase.from('listings').select('*').eq('id', engagement.listingId).maybeSingle(),
-    supabase.from('users').select('*').in('id', [engagement.listingOwnerId, engagement.requesterUserId]),
-  ]);
-  const users = new Map((userRows || []).map((userRow) => {
-    const user = normalizeUserRow(userRow);
-    return [user.id, user];
-  }));
-
-  return flattenEngagement(
-    engagement,
-    listing,
-    users.get(engagement.listingOwnerId),
-    users.get(engagement.requesterUserId)
-  );
-}
-
-async function getEngagementMessages(engagementId) {
-  const { data, error } = await supabase
-    .from('engagement_messages')
-    .select('*')
-    .eq('engagementId', engagementId)
-    .order('createdAt', { ascending: true });
-  
-  if (error) return [];
-  return (data || []).map((row) => ({
-    ...row,
-    engagementId: getFirstDefined(row, ['engagementId', 'engagementid']),
-    senderUserId: getFirstDefined(row, ['senderUserId', 'senderuserid']),
-    senderName: getFirstDefined(row, ['senderName', 'sendername']),
-    etaNote: getFirstDefined(row, ['etaNote', 'etanote']),
-    locationNote: getFirstDefined(row, ['locationNote', 'locationnote']),
-    createdAt: getFirstDefined(row, ['createdAt', 'createdat']),
-  }));
-}
-
-async function getEngagementsForUser(user) {
-  const { data, error } = await supabase
-    .from('engagements')
-    .select('*')
-    .or(`listingOwnerId.eq.${user.id},requesterUserId.eq.${user.id}`)
-    .order('updatedAt', { ascending: false });
-  
-  if (error) throw error;
-  
-  const rows = (data || []).map(normalizeEngagementRow);
-  const listingIds = [...new Set(rows.map((row) => row.listingId).filter(Boolean))];
-  const userIds = [...new Set(rows.flatMap((row) => [row.listingOwnerId, row.requesterUserId]).filter(Boolean))];
-  const [{ data: listingRows, error: listingError }, { data: userRows, error: userError }] = await Promise.all([
-    listingIds.length ? supabase.from('listings').select('*').in('id', listingIds) : { data: [], error: null },
-    userIds.length ? supabase.from('users').select('*').in('id', userIds) : { data: [], error: null },
-  ]);
-  if (listingError) throw listingError;
-  if (userError) throw userError;
-
-  const listings = new Map((listingRows || []).map((listing) => [listing.id, listing]));
-  const users = new Map((userRows || []).map((userRow) => {
-    const normalizedUser = normalizeUserRow(userRow);
-    return [normalizedUser.id, normalizedUser];
-  }));
-  const results = [];
-  
-  for (const row of rows) {
-    const messages = await getEngagementMessages(row.id);
-    results.push(flattenEngagement(
-      row,
-      listings.get(row.listingId),
-      users.get(row.listingOwnerId),
-      users.get(row.requesterUserId),
-      messages
-    ));
-  }
-  
-  return results;
 }
 
 const CATEGORY_KEYWORDS = {
@@ -1622,9 +1490,6 @@ app.delete('/api/auth/account', async (req, res, next) => {
 
     // Delete user's data
     await supabase.from('sessions').delete().eq('userId', userId);
-    await supabase.from('engagement_messages').delete().eq('senderUserId', userId);
-    await supabase.from('engagements').delete().eq('requesterUserId', userId);
-    await supabase.from('engagements').delete().eq('listingOwnerId', userId);
     await supabase.from('listings').delete().eq('ownerUserId', userId);
     await supabase.from('users').delete().eq('id', userId);
 
@@ -1849,215 +1714,6 @@ app.delete('/api/listings/:id', async (req, res, next) => {
   }
 });
 
-// Engagement Endpoints
-app.get('/api/engagements', async (req, res, next) => {
-  try {
-    await requireAuth(req, res, () => {});
-    if (!req.user) return;
-
-    const engagements = await getEngagementsForUser(req.user);
-    res.json({ success: true, engagements });
-  } catch (err) {
-    console.error('Get engagements error:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-app.post('/api/listings/:id/requests', async (req, res, next) => {
-  try {
-    await requireAuth(req, res, () => {});
-    if (!req.user) return;
-
-    const { data: listing, error: fetchError } = await supabase
-      .from('listings')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
-
-    if (fetchError || !listing) {
-      return res.status(404).json({ success: false, error: 'Listing not found' });
-    }
-
-    const ownerUserId = String(listing.ownerUserId || listing.owneruserid || '');
-    if (!ownerUserId) {
-      return res.status(400).json({ success: false, error: 'Listing is missing owner information' });
-    }
-
-    if (ownerUserId === req.user.id) {
-      return res.status(400).json({ success: false, error: 'You cannot start a private chat with your own listing' });
-    }
-
-    const { data: ownerUser, error: ownerFetchError } = await supabase
-      .from('users')
-      .select('id, role')
-      .eq('id', ownerUserId)
-      .single();
-
-    if (ownerFetchError || !ownerUser) {
-      return res.status(404).json({ success: false, error: 'Listing owner not found' });
-    }
-
-    const ownerRole = String(ownerUser.role || '');
-    const requesterRole = String(req.user.role || '');
-    const rolePair = new Set([ownerRole, requesterRole]);
-    const isBusinessNonprofitPair = rolePair.has('business') && rolePair.has('organization') && rolePair.size === 2;
-    if (!isBusinessNonprofitPair) {
-      return res.status(400).json({ success: false, error: 'Private chat is only available between a business and a nonprofit' });
-    }
-
-    const { data: existingEngagement } = await supabase
-      .from('engagements')
-      .select('id, status')
-      .eq('listingId', req.params.id)
-      .eq('listingOwnerId', ownerUserId)
-      .eq('requesterUserId', req.user.id)
-      .in('status', ['requested', 'accepted', 'preparing', 'on_the_way', 'delivered'])
-      .order('updatedAt', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (existingEngagement?.id) {
-      return res.json({ success: true, engagementId: existingEngagement.id, reused: true });
-    }
-
-    const engagementId = crypto.randomUUID();
-    const now = new Date().toISOString();
-
-    const { error } = await supabase.from('engagements').insert([{
-      id: engagementId,
-      listingId: req.params.id,
-      listingid: req.params.id,
-      listingOwnerId: ownerUserId,
-      listingownerid: ownerUserId,
-      requesterUserId: req.user.id,
-      requesteruserid: req.user.id,
-      status: 'requested',
-      createdAt: now,
-      createdat: now,
-      updatedAt: now,
-      updatedat: now,
-    }]);
-
-    if (error) {
-      return res.status(500).json({ success: false, error: error.message });
-    }
-
-    res.json({ success: true, engagementId });
-  } catch (err) {
-    console.error('Create engagement error:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-app.patch('/api/engagements/:id/status', async (req, res, next) => {
-  try {
-    await requireAuth(req, res, () => {});
-    if (!req.user) return;
-
-    const { status } = req.body;
-    if (!status || !['requested', 'accepted', 'preparing', 'on_the_way', 'delivered', 'completed', 'declined', 'cancelled'].includes(status)) {
-      return res.status(400).json({ success: false, error: 'Invalid status' });
-    }
-
-    const { data: engagement, error: fetchError } = await supabase
-      .from('engagements')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
-
-    if (fetchError || !engagement) {
-      return res.status(404).json({ success: false, error: 'Engagement not found' });
-    }
-
-    if (!canAccessEngagement(engagement, req.user)) {
-      return res.status(403).json({ success: false, error: 'Access denied' });
-    }
-
-    const listingOwnerId = getFirstDefined(engagement, ['listingOwnerId', 'listingownerid']);
-    const requesterUserId = getFirstDefined(engagement, ['requesterUserId', 'requesteruserid']);
-    if (['accepted', 'declined'].includes(status) && listingOwnerId !== req.user.id) {
-      return res.status(403).json({ success: false, error: 'Only the listing owner can accept or decline this request' });
-    }
-    if (status === 'cancelled' && requesterUserId !== req.user.id) {
-      return res.status(403).json({ success: false, error: 'Only the requester can cancel this request' });
-    }
-
-    const updatedAt = new Date().toISOString();
-    const { error } = await supabase
-      .from('engagements')
-      .update({ status, updatedAt })
-      .eq('id', req.params.id);
-
-    if (error) {
-      return res.status(500).json({ success: false, error: error.message });
-    }
-
-    res.json({ success: true });
-  } catch (err) {
-    console.error('Update engagement status error:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-app.post('/api/engagements/:id/messages', async (req, res, next) => {
-  try {
-    await requireAuth(req, res, () => {});
-    if (!req.user) return;
-
-    const { body, etaNote, locationNote } = req.body;
-    if (!body) {
-      return res.status(400).json({ success: false, error: 'message body is required' });
-    }
-
-    const { data: engagement, error: fetchError } = await supabase
-      .from('engagements')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
-
-    if (fetchError || !engagement) {
-      return res.status(404).json({ success: false, error: 'Engagement not found' });
-    }
-
-    if (!canAccessEngagement(engagement, req.user)) {
-      return res.status(403).json({ success: false, error: 'Access denied' });
-    }
-
-    if (engagement.status !== 'accepted') {
-      return res.status(409).json({ success: false, error: 'Messages are available after the request is accepted' });
-    }
-
-    const messageId = crypto.randomUUID();
-    const now = new Date().toISOString();
-
-    const { error } = await supabase.from('engagement_messages').insert([{
-      id: messageId,
-      engagementId: req.params.id,
-      engagementid: req.params.id,
-      senderUserId: req.user.id,
-      senderuserid: req.user.id,
-      senderName: req.user.displayName,
-      sendername: req.user.displayName,
-      body,
-      etaNote: etaNote || '',
-      etanote: etaNote || '',
-      locationNote: locationNote || '',
-      locationnote: locationNote || '',
-      createdAt: now,
-      createdat: now,
-    }]);
-
-    if (error) {
-      return res.status(500).json({ success: false, error: error.message });
-    }
-
-    res.json({ success: true, messageId });
-  } catch (err) {
-    console.error('Create message error:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
 // Search and Matching Endpoints
 app.get('/api/match/:query', async (req, res, next) => {
   try {
@@ -2083,7 +1739,6 @@ app.get('/api/stats', async (req, res) => {
   try {
     const { data: listings } = await supabase.from('listings').select('type, urgent, active');
     const { data: users } = await supabase.from('users').select('role');
-    const { data: engagements } = await supabase.from('engagements').select('status');
     const activeListings = listings?.filter(l => l.active === 1) || [];
 
     const stats = {
@@ -2095,8 +1750,6 @@ app.get('/api/stats', async (req, res) => {
       totalUsers: users?.length || 0,
       businessUsers: users?.filter(u => u.role === 'business').length || 0,
       organizationUsers: users?.filter(u => u.role === 'organization').length || 0,
-      totalEngagements: engagements?.length || 0,
-      completedEngagements: engagements?.filter(e => e.status === 'completed').length || 0,
       total: activeListings.length,
       supply: activeListings.filter(l => l.type === 'supply').length,
       demand: activeListings.filter(l => l.type === 'demand').length
@@ -2151,6 +1804,48 @@ app.get('/api/organizations', async (req, res) => {
       .limit(200);
 
     if (error) return res.status(500).json({ success: false, error: error.message });
+
+    const organizations = (data || []).map((row) => {
+      const user = normalizeUserRow(row);
+      return {
+        id: user.id,
+        displayName: user.displayName,
+        organizationName: user.organizationName || user.displayName,
+        location: publicLocation(user.location),
+      };
+    });
+
+    res.json({ success: true, organizations });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/donation-recipients', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+    if (req.user.role !== 'business') {
+      return res.status(403).json({ success: false, error: 'Only business users can select donation recipients.' });
+    }
+
+    const listingRows = await getVisibleActiveListings(req.user);
+    const recipientIds = [...new Set(
+      listingRows
+        .filter((listing) => listing.type === 'demand')
+        .map((listing) => String(getFirstDefined(listing, ['ownerUserId', 'owneruserid']) || ''))
+        .filter(Boolean)
+    )];
+    if (recipientIds.length === 0) {
+      return res.json({ success: true, organizations: [] });
+    }
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('role', 'organization')
+      .in('id', recipientIds);
+    if (error) return res.status(500).json({ success: false, error: explainSupabaseError(error) });
 
     const organizations = (data || []).map((row) => {
       const user = normalizeUserRow(row);
@@ -2578,42 +2273,6 @@ app.post('/api/chat/action', async (req, res) => {
       });
     }
 
-    if (actionId === 'accept' && data && data.id && req.user.role === 'organization') {
-      const { data: listing, error: fetchError } = await supabase
-        .from('listings')
-        .select('*')
-        .eq('id', data.id)
-        .single();
-
-      if (!fetchError && listing) {
-        const engagementId = crypto.randomUUID();
-        const now = new Date().toISOString();
-        await supabase.from('engagements').insert([{
-          id: engagementId,
-          listingId: listing.id,
-          listingid: listing.id,
-          listingOwnerId: listing.ownerUserId,
-          listingownerid: listing.ownerUserId,
-          requesterUserId: req.user.id,
-          requesteruserid: req.user.id,
-          status: 'requested',
-          createdAt: now,
-          createdat: now,
-          updatedAt: now,
-          updatedat: now,
-        }]);
-      }
-
-      return res.json({
-        success: true,
-        reply: {
-          message: 'Request sent. Check the coordination board for updates.',
-          actions: [],
-          suggestions: [{ id: 'show_urgent', text: 'Show urgent listings' }],
-        },
-      });
-    }
-
     return res.json({
       success: true,
       reply: {
@@ -2763,7 +2422,7 @@ app.get('/api/donations', async (req, res) => {
       query = query.eq('status', String(req.query.status));
     }
     if (req.user.role === 'business') {
-      query = query.eq('donorOrgId', req.user.id);
+      query = query.eq('createdByUserId', req.user.id);
     }
     if (req.user.role === 'organization') {
       query = query.eq('recipientOrgId', req.user.id);
@@ -2777,7 +2436,27 @@ app.get('/api/donations', async (req, res) => {
       return res.status(500).json({ success: false, error: explainSupabaseError(error) });
     }
 
-    res.json({ success: true, donations: data || [] });
+    const donations = data || [];
+    const recipientIds = [...new Set(
+      donations
+        .map((donation) => String(getFirstDefined(donation, ['recipientOrgId', 'recipientorgid']) || ''))
+        .filter(Boolean)
+    )];
+    const { data: recipientRows } = recipientIds.length
+      ? await supabase.from('users').select('*').in('id', recipientIds)
+      : { data: [] };
+    const recipientNames = new Map((recipientRows || []).map((row) => {
+      const user = normalizeUserRow(row);
+      return [user.id, user.organizationName || user.displayName];
+    }));
+
+    res.json({
+      success: true,
+      donations: donations.map((donation) => ({
+        ...donation,
+        recipientName: recipientNames.get(String(getFirstDefined(donation, ['recipientOrgId', 'recipientorgid']) || '')) || 'Assigned nonprofit',
+      })),
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -2790,7 +2469,7 @@ app.get('/api/donations/impact-summary', async (req, res) => {
 
     let query = supabase.from('donation_records').select('status, quantity, estimatedTotalValue, recipientOrgId');
     if (req.user.role === 'business') {
-      query = query.eq('donorOrgId', req.user.id);
+      query = query.eq('createdByUserId', req.user.id);
     }
     if (req.user.role === 'organization') {
       query = query.eq('recipientOrgId', req.user.id);
@@ -2834,7 +2513,7 @@ app.get('/api/donations/export', async (req, res) => {
 
     let query = supabase.from('donation_records').select('*').order('createdAt', { ascending: false }).limit(500);
     if (req.user.role === 'business') {
-      query = query.eq('donorOrgId', req.user.id);
+      query = query.eq('createdByUserId', req.user.id);
     }
     if (req.user.role === 'organization') {
       query = query.eq('recipientOrgId', req.user.id);
@@ -2890,9 +2569,9 @@ app.get('/api/donations/:id', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Donation not found' });
     }
 
-    const donorOrgId = String(getFirstDefined(donation, ['donorOrgId', 'donororgid']));
+    const createdByUserId = String(getFirstDefined(donation, ['createdByUserId', 'createdbyuserid']));
     const recipientOrgId = String(getFirstDefined(donation, ['recipientOrgId', 'recipientorgid']));
-    if (req.user.role !== 'admin' && donorOrgId !== req.user.id && recipientOrgId !== req.user.id) {
+    if (req.user.role !== 'admin' && createdByUserId !== req.user.id && recipientOrgId !== req.user.id) {
       return res.status(403).json({ success: false, error: 'Access denied' });
     }
 
@@ -2927,9 +2606,9 @@ app.get('/api/donations/:id/acknowledgment', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Donation not found' });
     }
 
-    const donorOrgId = String(getFirstDefined(donation, ['donorOrgId', 'donororgid']));
+    const createdByUserId = String(getFirstDefined(donation, ['createdByUserId', 'createdbyuserid']));
     const recipientOrgId = String(getFirstDefined(donation, ['recipientOrgId', 'recipientorgid']));
-    if (req.user.role !== 'admin' && donorOrgId !== req.user.id && recipientOrgId !== req.user.id) {
+    if (req.user.role !== 'admin' && createdByUserId !== req.user.id && recipientOrgId !== req.user.id) {
       return res.status(403).json({ success: false, error: 'Access denied' });
     }
     if (String(getFirstDefined(donation, ['status'])) !== 'received') {
@@ -3044,8 +2723,8 @@ app.post('/api/donations/:id/handoff-token', async (req, res) => {
       return res.status(404).json({ success: false, error: 'Donation not found' });
     }
 
-    const donorOrgId = String(getFirstDefined(donation, ['donorOrgId', 'donororgid']));
-    if (donorOrgId !== req.user.id && req.user.role !== 'admin') {
+    const createdByUserId = String(getFirstDefined(donation, ['createdByUserId', 'createdbyuserid']));
+    if (createdByUserId !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, error: 'Only the donor can generate handoff tokens.' });
     }
     if (String(donation.status) !== 'accepted') {

@@ -12,11 +12,8 @@ import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { useChatNotifications } from '@/context/chat-notifications-context';
 
 export default function AppTabs() {
-  const { unreadCount } = useChatNotifications();
-
   return (
     <Tabs>
       <TabSlot style={{ height: '100%' }} />
@@ -28,16 +25,13 @@ export default function AppTabs() {
           <TabTrigger name="explore" href="/explore" asChild>
             <TabButton>Explore</TabButton>
           </TabTrigger>
-          <TabTrigger name="messages" href="/messages" asChild>
-            <TabButton badge={unreadCount}>Chats</TabButton>
-          </TabTrigger>
         </CustomTabList>
       </TabList>
     </Tabs>
   );
 }
 
-export function TabButton({ children, isFocused, badge = 0, ...props }: TabTriggerSlotProps & { badge?: number }) {
+export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps) {
   return (
     <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
       <ThemedView
@@ -46,9 +40,6 @@ export function TabButton({ children, isFocused, badge = 0, ...props }: TabTrigg
         <ThemedText type="small" themeColor={isFocused ? 'text' : 'textSecondary'}>
           {children}
         </ThemedText>
-        {badge > 0 ? (
-          <ThemedText style={styles.badgeText}>{badge > 99 ? '99+' : badge}</ThemedText>
-        ) : null}
       </ThemedView>
     </Pressable>
   );
@@ -104,17 +95,5 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
     paddingHorizontal: Spacing.three,
     borderRadius: Spacing.three,
-  },
-  badgeText: {
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    paddingHorizontal: 5,
-    overflow: 'hidden',
-    textAlign: 'center',
-    color: '#FFFFFF',
-    backgroundColor: '#B54840',
-    fontSize: 11,
-    lineHeight: 18,
   },
 });

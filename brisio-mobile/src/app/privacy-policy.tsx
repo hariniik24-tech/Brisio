@@ -42,12 +42,7 @@ Information included in listings may include descriptions, availability informat
 
 You should avoid including unnecessary sensitive personal information in public listings.
 
-D. Messages and Communications
-Brisio may collect and store messages or other communications sent through the Service.
-
-We use this information to provide messaging functionality, maintain the Service, address reports or disputes, enforce our Terms and Conditions, and help protect users from abuse.
-
-E. Information Collected Automatically
+D. Information Collected Automatically
 Brisio and its service providers may automatically receive limited technical information when you use the Service, such as:
 - Device type
 - Operating system and version
@@ -64,7 +59,6 @@ We may use information we collect to:
 - Authenticate users
 - Provide Brisio's resource-sharing and matching functionality
 - Display and manage listings
-- Enable communication between users
 - Help users discover resources in relevant locations
 - Provide customer support
 - Respond to questions and requests
@@ -94,8 +88,6 @@ B. With Other Brisio Users
 Some information may be shared with other Brisio users when necessary for Brisio's functionality.
 
 For example, information associated with a resource listing may be displayed to other users so that they can understand and interact with the listing.
-
-Information contained in messages may be available to the intended recipients of those messages.
 
 Users should assume that information they voluntarily place in listings or otherwise make available through Brisio may be visible to other authorized users.
 
@@ -134,7 +126,7 @@ When an account is deleted, we will delete or de-identify associated personal in
 
 Some information may remain for a limited period where necessary to comply with legal obligations, resolve disputes, prevent fraud or abuse, maintain security, or otherwise fulfill a lawful purpose.
 
-Deleting your account may also remove listings, messages, profile information, and other content associated with your account where applicable.
+Deleting your account may also remove listings, profile information, and other content associated with your account where applicable.
 
 7. Your Privacy Choices
 Depending on applicable law, you may have rights regarding your personal information, including the right to:

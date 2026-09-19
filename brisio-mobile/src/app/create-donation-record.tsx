@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraView, useCameraPermissions, type BarcodeType } from 'expo-camera';
 
 import { StackScreenShell } from '@/components/stack-screen-shell';
 import { ThemedText } from '@/components/themed-text';
@@ -16,6 +16,7 @@ import { Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
 
 const INPUT_PLACEHOLDER_COLOR = '#6A7685';
+const RETAIL_BARCODE_TYPES: BarcodeType[] = ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128'];
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
@@ -25,6 +26,7 @@ export default function CreateDonationRecordScreen() {
   const router = useRouter();
   const session = useSessionContext();
   const submittingRef = useRef(false);
+  const scanHandledRef = useRef(false);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [barcode, setBarcode] = useState('');
   const [lookupBusy, setLookupBusy] = useState(false);
@@ -101,14 +103,43 @@ export default function CreateDonationRecordScreen() {
         return;
       }
     }
+    scanHandledRef.current = false;
     setHasScanned(false);
+    setMessage('');
+
+    if (Platform.OS !== 'web' && CameraView.isModernBarcodeScannerAvailable) {
+      const subscription = CameraView.onModernBarcodeScanned((result) => {
+        if (scanHandledRef.current) return;
+        subscription.remove();
+        if (Platform.OS === 'ios') {
+          void CameraView.dismissScanner();
+        }
+        void handleBarcodeScanned(result);
+      });
+      try {
+        await CameraView.launchScanner({
+          barcodeTypes: RETAIL_BARCODE_TYPES,
+          isGuidanceEnabled: true,
+          isHighlightingEnabled: true,
+          isPinchToZoomEnabled: true,
+        });
+      } catch (err) {
+        setMessage(err instanceof Error ? err.message : 'Could not start the barcode scanner.');
+      } finally {
+        subscription.remove();
+      }
+      return;
+    }
+
     setScannerOpen(true);
   }
 
   async function handleBarcodeScanned({ data }: { data: string }) {
-    if (hasScanned) return;
+    if (scanHandledRef.current) return;
+    scanHandledRef.current = true;
     setHasScanned(true);
     setScannerOpen(false);
+    setMessage('Barcode detected. Identifying item...');
     await runLookup(data);
   }
 
@@ -176,12 +207,20 @@ export default function CreateDonationRecordScreen() {
 
       {scannerOpen ? (
         <View style={styles.scannerCard}>
-          <CameraView
-            style={styles.camera}
-            facing="back"
-            onBarcodeScanned={hasScanned ? undefined : handleBarcodeScanned}
-            barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128'] }}
-          />
+          <View style={styles.cameraFrame}>
+            <CameraView
+              style={styles.camera}
+              facing="back"
+              onCameraReady={() => setMessage('Scanner ready. Center the product barcode in the frame.')}
+              onMountError={({ message: cameraError }) => setMessage(cameraError || 'Could not start the camera.')}
+              onBarcodeScanned={hasScanned ? undefined : handleBarcodeScanned}
+              barcodeScannerSettings={{ barcodeTypes: RETAIL_BARCODE_TYPES }}
+            />
+            <View style={styles.scanGuide} pointerEvents="none">
+              <View style={styles.scanTarget} />
+              <ThemedText type="smallBold" style={styles.scanGuideText}>Center the product barcode</ThemedText>
+            </View>
+          </View>
           <Pressable style={styles.secondaryBtn} onPress={() => setScannerOpen(false)}>
             <ThemedText type="smallBold">Cancel scan</ThemedText>
           </Pressable>
@@ -270,7 +309,11 @@ const styles = StyleSheet.create({
   textArea: { minHeight: 90, textAlignVertical: 'top' },
   card: { borderWidth: 1, borderColor: '#D6DFEA', borderRadius: Spacing.three, padding: Spacing.three, gap: 4, backgroundColor: '#FAFCFF' },
   scannerCard: { borderWidth: 1, borderColor: '#C9D8EC', borderRadius: Spacing.three, overflow: 'hidden', gap: Spacing.two, paddingBottom: Spacing.two, backgroundColor: '#F3F8FF' },
+  cameraFrame: { position: 'relative' },
   camera: { height: 280, width: '100%' },
+  scanGuide: { position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', gap: Spacing.two },
+  scanTarget: { width: '78%', height: 108, borderWidth: 2, borderColor: '#FFFFFF', borderRadius: Spacing.two, backgroundColor: 'transparent' },
+  scanGuideText: { color: '#FFFFFF', backgroundColor: '#1C2735CC', paddingHorizontal: Spacing.two, paddingVertical: Spacing.one, borderRadius: Spacing.two },
   actionRow: { flexDirection: 'row', gap: Spacing.two },
   actionBtn: { flex: 1 },
   orgList: { gap: Spacing.two },

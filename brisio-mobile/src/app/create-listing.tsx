@@ -76,6 +76,9 @@ export default function CreateListingScreen() {
       <ThemedText type="small" style={styles.helperText}>
         Share what is available or describe what your organization needs.
       </ThemedText>
+      <ThemedText type="smallBold">
+        Posting as {session.user.organizationName || session.user.displayName}
+      </ThemedText>
 
       <ThemedText type="smallBold">Category</ThemedText>
       <TextInput

@@ -2084,7 +2084,7 @@ app.get('/api/match/:query', async (req, res, next) => {
 
 // Statistics Endpoints
 app.get('/api/health', (req, res) => {
-  res.json({ success: true });
+  res.json({ success: true, commit: String(process.env.RENDER_GIT_COMMIT || '').slice(0, 7) });
 });
 
 app.get('/api/stats', async (req, res) => {

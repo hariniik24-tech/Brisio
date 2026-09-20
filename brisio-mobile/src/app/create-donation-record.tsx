@@ -17,6 +17,7 @@ import { useSessionContext } from '@/context/session-context';
 
 const INPUT_PLACEHOLDER_COLOR = '#6A7685';
 const RETAIL_BARCODE_TYPES: BarcodeType[] = ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128'];
+const IOS_RETAIL_BARCODE_TYPES: BarcodeType[] = ['ean13', 'ean8', 'upc_e'];
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
@@ -34,6 +35,7 @@ export default function CreateDonationRecordScreen() {
   const [product, setProduct] = useState<ApiScannedProduct | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [hasScanned, setHasScanned] = useState(false);
+  const [torchEnabled, setTorchEnabled] = useState(false);
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('');
   const [estimatedUnitValue, setEstimatedUnitValue] = useState('');
@@ -117,6 +119,7 @@ export default function CreateDonationRecordScreen() {
     }
     scanHandledRef.current = false;
     setHasScanned(false);
+    setTorchEnabled(false);
     setMessage('');
 
     if (Platform.OS === 'android' && CameraView.isModernBarcodeScannerAvailable) {
@@ -225,19 +228,27 @@ export default function CreateDonationRecordScreen() {
             <CameraView
               style={styles.camera}
               facing="back"
-              onCameraReady={() => setMessage('Scanner ready. Center the product barcode in the frame.')}
+              autofocus="off"
+              enableTorch={torchEnabled}
+              onCameraReady={() => setMessage('Scanner ready. Hold the phone 6-10 inches away and keep the entire barcode in the frame.')}
               onMountError={({ message: cameraError }) => setMessage(cameraError || 'Could not start the camera.')}
               onBarcodeScanned={hasScanned ? undefined : handleBarcodeScanned}
-              barcodeScannerSettings={{ barcodeTypes: RETAIL_BARCODE_TYPES }}
+              barcodeScannerSettings={{ barcodeTypes: Platform.OS === 'ios' ? IOS_RETAIL_BARCODE_TYPES : RETAIL_BARCODE_TYPES }}
             />
             <View style={styles.scanGuide} pointerEvents="none">
               <View style={styles.scanTarget} />
-              <ThemedText type="smallBold" style={styles.scanGuideText}>Center the product barcode</ThemedText>
+              <ThemedText type="smallBold" style={styles.scanGuideText}>Keep the whole barcode visible</ThemedText>
+              <ThemedText type="small" style={styles.scanDistanceText}>Move farther away if the lines look blurry</ThemedText>
             </View>
           </View>
-          <Pressable style={styles.secondaryBtn} onPress={() => setScannerOpen(false)}>
-            <ThemedText type="smallBold">Cancel scan</ThemedText>
-          </Pressable>
+          <View style={styles.scannerActions}>
+            <Pressable style={[styles.secondaryBtn, styles.actionBtn]} onPress={() => setTorchEnabled((enabled) => !enabled)}>
+              <ThemedText type="smallBold">{torchEnabled ? 'Turn light off' : 'Turn light on'}</ThemedText>
+            </Pressable>
+            <Pressable style={[styles.secondaryBtn, styles.actionBtn]} onPress={() => setScannerOpen(false)}>
+              <ThemedText type="smallBold">Cancel scan</ThemedText>
+            </Pressable>
+          </View>
         </View>
       ) : null}
 
@@ -339,10 +350,12 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderColor: '#D6DFEA', borderRadius: Spacing.three, padding: Spacing.three, gap: 4, backgroundColor: '#FAFCFF' },
   scannerCard: { borderWidth: 1, borderColor: '#C9D8EC', borderRadius: Spacing.three, overflow: 'hidden', gap: Spacing.two, paddingBottom: Spacing.two, backgroundColor: '#F3F8FF' },
   cameraFrame: { position: 'relative' },
-  camera: { height: 280, width: '100%' },
+  camera: { height: 360, width: '100%' },
   scanGuide: { position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', gap: Spacing.two },
-  scanTarget: { width: '78%', height: 108, borderWidth: 2, borderColor: '#FFFFFF', borderRadius: Spacing.two, backgroundColor: 'transparent' },
+  scanTarget: { width: '90%', height: 132, borderWidth: 2, borderColor: '#FFFFFF', borderRadius: Spacing.two, backgroundColor: 'transparent' },
   scanGuideText: { color: '#FFFFFF', backgroundColor: '#1C2735CC', paddingHorizontal: Spacing.two, paddingVertical: Spacing.one, borderRadius: Spacing.two },
+  scanDistanceText: { color: '#FFFFFF', backgroundColor: '#1C2735CC', paddingHorizontal: Spacing.two, paddingVertical: Spacing.one, borderRadius: Spacing.two },
+  scannerActions: { flexDirection: 'row', gap: Spacing.two, paddingHorizontal: Spacing.two },
   actionRow: { flexDirection: 'row', gap: Spacing.two },
   actionBtn: { flex: 1 },
   orgList: { gap: Spacing.two },

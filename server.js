@@ -712,6 +712,7 @@ const SAMPLE_PRODUCT_CATALOG = {
 
 const productLookupCache = new Map();
 const PRODUCT_LOOKUP_CACHE_MS = 24 * 60 * 60 * 1000;
+const PRODUCT_LOOKUP_NO_PRICE_CACHE_MS = 5 * 60 * 1000;
 
 async function fetchProductJson(url) {
   const response = await fetch(url, {
@@ -759,11 +760,19 @@ async function lookupExternalProduct(barcode) {
       upcItem = upcResponse?.items?.[0] || null;
       if (!estimatedUnitValue && upcItem) {
         const recentCutoff = Math.floor(Date.now() / 1000) - (2 * 365 * 24 * 60 * 60);
-        const offerPrices = (upcItem.offers || [])
+        const availableOffers = (upcItem.offers || [])
           .filter((offer) => Number(offer.updated_t || 0) >= recentCutoff && !/out of stock/i.test(String(offer.availability || '')))
-          .map((offer) => Number(offer.price));
-        estimatedUnitValue = medianPrice(offerPrices);
-        if (estimatedUnitValue) priceSource = 'UPCitemdb recent retailer estimate';
+        const recentOfferPrices = availableOffers.map((offer) => Number(offer.price));
+        estimatedUnitValue = medianPrice(recentOfferPrices);
+        if (estimatedUnitValue) {
+          priceSource = 'UPCitemdb recent retailer estimate';
+        } else {
+          const historicalOfferPrices = (upcItem.offers || [])
+            .filter((offer) => !/out of stock/i.test(String(offer.availability || '')))
+            .map((offer) => Number(offer.price));
+          estimatedUnitValue = medianPrice(historicalOfferPrices);
+          if (estimatedUnitValue) priceSource = 'UPCitemdb historical retailer estimate';
+        }
       }
     } catch (err) {
       console.warn('UPCitemdb lookup failed:', err.message);
@@ -784,7 +793,7 @@ async function lookupExternalProduct(barcode) {
 
   if (productLookupCache.size >= 500) productLookupCache.clear();
   productLookupCache.set(barcode, {
-    expiresAt: Date.now() + (value ? PRODUCT_LOOKUP_CACHE_MS : 5 * 60 * 1000),
+    expiresAt: Date.now() + (value?.estimatedUnitValue ? PRODUCT_LOOKUP_CACHE_MS : PRODUCT_LOOKUP_NO_PRICE_CACHE_MS),
     value,
   });
   return value;

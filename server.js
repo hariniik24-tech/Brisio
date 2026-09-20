@@ -2508,21 +2508,28 @@ app.post('/api/donations', async (req, res) => {
     const item = donation.item || {};
     const productName = String(item.name || '').trim();
 
-    if (!recipientOrgId || !donorLocationId || !productName || !Number.isFinite(quantity) || quantity <= 0) {
+    if (!donorLocationId || !productName || !Number.isFinite(quantity) || quantity <= 0) {
       return res.status(400).json({
         success: false,
-        error: 'recipientOrgId, donorLocationId, item.name, and a positive quantity are required',
+        error: 'donorLocationId, item.name, and a positive quantity are required',
       });
     }
 
-    const { data: recipient, error: recipientError } = await supabase
-      .from('users')
-      .select('id, role')
-      .eq('id', recipientOrgId)
-      .single();
+    if (recipientOrgId) {
+      const { data: recipient, error: recipientError } = await supabase
+        .from('users')
+        .select('id, role')
+        .eq('id', recipientOrgId)
+        .single();
 
-    if (recipientError || !recipient || String(recipient.role) !== 'organization') {
-      return res.status(400).json({ success: false, error: 'recipientOrgId must reference an organization account' });
+      if (recipientError || !recipient || String(recipient.role) !== 'organization') {
+        return res.status(400).json({ success: false, error: 'recipientOrgId must reference an organization account' });
+      }
+      const eligibleListings = await getVisibleActiveListings(req.user);
+      const isEligible = eligibleListings.some((listing) => listing.type === 'demand' && listing.ownerUserId === recipientOrgId);
+      if (!isEligible) {
+        return res.status(400).json({ success: false, error: 'The selected nonprofit must have an active resource request.' });
+      }
     }
 
     const id = `don_${crypto.randomUUID()}`;
@@ -2634,7 +2641,7 @@ app.get('/api/donations', async (req, res) => {
       success: true,
       donations: donations.map((donation) => ({
         ...donation,
-        recipientName: recipientNames.get(String(getFirstDefined(donation, ['recipientOrgId', 'recipientorgid']) || '')) || 'Assigned nonprofit',
+        recipientName: recipientNames.get(String(getFirstDefined(donation, ['recipientOrgId', 'recipientorgid']) || '')) || 'Not assigned yet',
       })),
     });
   } catch (err) {
@@ -2806,12 +2813,23 @@ app.patch('/api/donations/:id', async (req, res) => {
       ? null
       : Number(input.estimatedUnitValue);
     const conditionNotes = String(input.conditionNotes || '').trim();
+    const hasRecipientUpdate = Object.hasOwn(input, 'recipientOrgId');
+    const recipientOrgId = hasRecipientUpdate
+      ? String(input.recipientOrgId || '').trim()
+      : String(getFirstDefined(donation, ['recipientOrgId', 'recipientorgid']) || '');
 
     if (!productName || !unit || !Number.isFinite(quantity) || quantity <= 0) {
       return res.status(400).json({ success: false, error: 'Product name, unit, and a positive quantity are required.' });
     }
     if (estimatedUnitValue !== null && (!Number.isFinite(estimatedUnitValue) || estimatedUnitValue < 0)) {
       return res.status(400).json({ success: false, error: 'Estimated unit value must be zero or greater.' });
+    }
+    if (hasRecipientUpdate && recipientOrgId) {
+      const eligibleListings = await getVisibleActiveListings(req.user);
+      const isEligible = eligibleListings.some((listing) => listing.type === 'demand' && listing.ownerUserId === recipientOrgId);
+      if (!isEligible) {
+        return res.status(400).json({ success: false, error: 'The selected nonprofit must have an active resource request.' });
+      }
     }
 
     const estimatedTotalValue = estimatedUnitValue === null ? null : Number((estimatedUnitValue * quantity).toFixed(2));
@@ -2831,6 +2849,7 @@ app.patch('/api/donations/:id', async (req, res) => {
       estimatedtotalvalue: estimatedTotalValue,
       conditionNotes,
       conditionnotes: conditionNotes,
+      ...(hasRecipientUpdate ? { recipientOrgId, recipientorgid: recipientOrgId } : {}),
       updatedAt: now,
       updatedat: now,
     };
@@ -2850,7 +2869,7 @@ app.patch('/api/donations/:id', async (req, res) => {
       eventType: 'updated',
       actorUserId: req.user.id,
       actorRole: req.user.role,
-      payload: { productName, productBrand, productCategory, quantity, unit, estimatedUnitValue, conditionNotes },
+      payload: { productName, productBrand, productCategory, quantity, unit, estimatedUnitValue, conditionNotes, recipientOrgId },
     });
 
     res.json({ success: true, donation: updated });

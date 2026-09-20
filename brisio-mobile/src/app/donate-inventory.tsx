@@ -8,11 +8,13 @@ import { ThemedText } from '@/components/themed-text';
 import {
   exportDonationRecordsCsv,
   deleteDonationRecord,
+  getDonationRecipients,
   generateDonationHandoffToken,
   getDonationImpactSummary,
   getDonations,
   updateDonationRecord,
   type ApiDonation,
+  type ApiOrganization,
 } from '@/constants/api';
 import { Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
@@ -29,6 +31,7 @@ type DonationEdit = {
   unit: string;
   estimatedUnitValue: string;
   conditionNotes: string;
+  recipientOrgId: string;
 };
 
 function formatCurrency(value: number) {
@@ -44,6 +47,7 @@ export default function DonateInventoryScreen() {
   const router = useRouter();
   const session = useSessionContext();
   const [records, setRecords] = useState<ApiDonation[]>([]);
+  const [organizations, setOrganizations] = useState<ApiOrganization[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -65,12 +69,14 @@ export default function DonateInventoryScreen() {
     setLoading(true);
     setMessage('');
     try {
-      const [recordsResponse, summaryResponse] = await Promise.all([
+      const [recordsResponse, summaryResponse, recipientsResponse] = await Promise.all([
         getDonations(session.token),
         getDonationImpactSummary(session.token),
+        getDonationRecipients(session.token),
       ]);
       setRecords(recordsResponse.donations || []);
       setSummary(summaryResponse.summary);
+      setOrganizations(recipientsResponse.organizations || []);
     } catch (err) {
       setRecords([]);
       setMessage(err instanceof Error ? err.message : 'Could not load your donation records.');
@@ -136,6 +142,7 @@ export default function DonateInventoryScreen() {
       unit: record.unit || 'units',
       estimatedUnitValue: typeof record.estimatedUnitValue === 'number' ? String(record.estimatedUnitValue) : '',
       conditionNotes: record.conditionNotes || '',
+      recipientOrgId: record.recipientOrgId || '',
     });
     setMessage('');
   }
@@ -164,6 +171,7 @@ export default function DonateInventoryScreen() {
         unit: editing.unit.trim(),
         estimatedUnitValue,
         conditionNotes: editing.conditionNotes.trim(),
+        recipientOrgId: editing.recipientOrgId,
       });
       setEditing(null);
       await loadRecords();
@@ -272,7 +280,7 @@ export default function DonateInventoryScreen() {
               <ThemedText type="smallBold" style={styles.recordName}>{record.productName || 'Donated inventory'}</ThemedText>
               <ThemedText type="small" style={styles.status}>{record.status}</ThemedText>
             </View>
-            <ThemedText type="small">Recipient: {record.recipientName || 'Assigned nonprofit'}</ThemedText>
+            <ThemedText type="small">Recipient: {record.recipientName || 'Not assigned yet'}</ThemedText>
             <ThemedText type="small">Quantity: {record.quantity} {record.unit}</ThemedText>
             <ThemedText type="small">Created: {formatDate(record.createdAt)}</ThemedText>
             {typeof record.estimatedUnitValue === 'number' ? <ThemedText type="small">Estimated value per unit: {formatCurrency(record.estimatedUnitValue)}</ThemedText> : null}
@@ -303,6 +311,22 @@ export default function DonateInventoryScreen() {
                 </View>
                 <ThemedText type="smallBold">Condition notes</ThemedText>
                 <TextInput style={[styles.input, styles.textArea]} value={editing.conditionNotes} onChangeText={(conditionNotes) => setEditing({ ...editing, conditionNotes })} multiline placeholder="Sealed case, best-by date" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
+                <ThemedText type="smallBold">Recipient nonprofit</ThemedText>
+                {organizations.length === 0 ? (
+                  <ThemedText type="small">No nonprofits currently have an active resource request. Keep this record unassigned for now.</ThemedText>
+                ) : (
+                  <View style={styles.orgList}>
+                    {organizations.map((organization) => (
+                      <Pressable
+                        key={organization.id}
+                        style={[styles.orgItem, editing.recipientOrgId === organization.id && styles.orgItemSelected]}
+                        onPress={() => setEditing({ ...editing, recipientOrgId: organization.id })}>
+                        <ThemedText type="smallBold">{organization.organizationName || organization.displayName}</ThemedText>
+                        <ThemedText type="small">{organization.location || 'Location not set'}</ThemedText>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
                 <View style={styles.actionRow}>
                   <Pressable style={[styles.primaryBtn, styles.actionBtn, editBusy && styles.disabledBtn]} onPress={saveEditing} disabled={editBusy}>
                     {editBusy ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Save changes</ThemedText>}
@@ -377,6 +401,9 @@ const styles = StyleSheet.create({
   currencyInput: { flex: 1, paddingHorizontal: Spacing.two, paddingVertical: 12, fontSize: 14, color: '#1C2735' },
   deleteBtn: { alignItems: 'center', borderRadius: Spacing.three, paddingVertical: Spacing.three, borderWidth: 1, borderColor: '#C86B65', backgroundColor: '#FFF5F4' },
   deleteText: { color: '#9C332D' },
+  orgList: { gap: Spacing.one },
+  orgItem: { borderWidth: 1, borderColor: '#D6DFEA', borderRadius: Spacing.three, padding: Spacing.two, backgroundColor: '#FFFFFF' },
+  orgItemSelected: { borderColor: '#476C9D', backgroundColor: '#EAF2FC' },
   textArea: { minHeight: 84, textAlignVertical: 'top' },
   qrBox: { alignItems: 'center', gap: Spacing.one, padding: Spacing.two, borderRadius: Spacing.three, backgroundColor: '#F3F8FF' },
   secondaryBtn: { alignItems: 'center', borderRadius: Spacing.three, paddingVertical: Spacing.three, paddingHorizontal: Spacing.two, borderWidth: 1, borderColor: '#CDD5E1', backgroundColor: '#F7F9FC' },

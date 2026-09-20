@@ -12,7 +12,7 @@ export default function DonationSuccessScreen() {
   return (
     <StackScreenShell>
       <ThemedText type="subtitle">Donation Recorded</ThemedText>
-      <ThemedText type="small">Your donation entry has been created and assigned to a nonprofit recipient.</ThemedText>
+      <ThemedText type="small">Your private donation entry has been saved. Its recipient status appears in My donation records.</ThemedText>
 
       <View style={styles.card}>
         <ThemedText type="smallBold">Record ID</ThemedText>

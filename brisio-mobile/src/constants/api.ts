@@ -384,6 +384,7 @@ export async function updateDonationRecord(
     unit: string;
     estimatedUnitValue?: number;
     conditionNotes: string;
+    recipientOrgId?: string;
   }
 ) {
   return apiRequest<{ success: true; donation: ApiDonation }>(`/api/donations/${encodeURIComponent(donationId)}`, {

@@ -48,8 +48,8 @@ export default function CreateDonationRecordScreen() {
 
   const canSubmit = useMemo(() => {
     const parsedQuantity = Number(quantity);
-    return !!product && !!recipientOrgId && Number.isFinite(parsedQuantity) && parsedQuantity > 0;
-  }, [product, quantity, recipientOrgId]);
+    return !!product && Number.isFinite(parsedQuantity) && parsedQuantity > 0;
+  }, [product, quantity]);
 
   useEffect(() => {
     if (!session.token || session.user?.role !== 'business') {
@@ -163,8 +163,8 @@ export default function CreateDonationRecordScreen() {
   async function submitRecord() {
     if (!session.token || !session.user || !product || submittingRef.current) return;
     const parsedQuantity = Number(quantity);
-    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0 || !recipientOrgId) {
-      setMessage('Choose a recipient and enter a quantity greater than zero.');
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+      setMessage('Enter a quantity greater than zero.');
       return;
     }
 
@@ -312,7 +312,7 @@ export default function CreateDonationRecordScreen() {
       ) : organizations.length === 0 ? (
         <View style={styles.card}>
           <ThemedText type="smallBold">No eligible nonprofit requests</ThemedText>
-          <ThemedText type="small">A nonprofit appears here only while it has an active resource-request listing in Explore.</ThemedText>
+          <ThemedText type="small">You can save this record unassigned. A nonprofit can be selected after it posts an active resource request.</ThemedText>
         </View>
       ) : (
         <View style={styles.orgList}>
@@ -339,7 +339,7 @@ export default function CreateDonationRecordScreen() {
       />
       {!!message ? <ThemedText style={styles.message}>{message}</ThemedText> : null}
       <Pressable style={[styles.primaryBtn, (!canSubmit || busy) && styles.disabledBtn]} onPress={submitRecord} disabled={!canSubmit || busy}>
-        {busy ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Create record</ThemedText>}
+        {busy ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">{recipientOrgId ? 'Create record' : 'Save unassigned record'}</ThemedText>}
       </Pressable>
     </StackScreenShell>
   );

@@ -1658,7 +1658,21 @@ app.delete('/api/auth/account', async (req, res, next) => {
 
     const userId = req.user.id;
 
-    // Delete user's data
+    const [{ data: createdDonations }, { data: receivedDonations }] = await Promise.all([
+      supabase.from('donation_records').select('id').eq('createdByUserId', userId),
+      supabase.from('donation_records').select('id').eq('recipientOrgId', userId),
+    ]);
+    const donationIds = [...new Set(
+      [...(createdDonations || []), ...(receivedDonations || [])]
+        .map((donation) => donation.id)
+        .filter(Boolean)
+    )];
+    if (donationIds.length > 0) {
+      await supabase.from('donation_handoffs').delete().in('donationId', donationIds);
+      await supabase.from('donation_events').delete().in('donationId', donationIds);
+      await supabase.from('donation_records').delete().in('id', donationIds);
+    }
+
     await supabase.from('sessions').delete().eq('userId', userId);
     await supabase.from('listings').delete().eq('ownerUserId', userId);
     await supabase.from('users').delete().eq('id', userId);

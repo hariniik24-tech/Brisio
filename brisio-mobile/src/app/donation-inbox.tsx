@@ -61,6 +61,10 @@ export default function DonationInboxScreen() {
     () => donations.filter((d) => getDonationText(d, ['status']) === 'posted').length,
     [donations]
   );
+  const acceptedCount = useMemo(
+    () => donations.filter((d) => getDonationText(d, ['status']) === 'accepted').length,
+    [donations]
+  );
 
   async function loadDonations() {
     if (!session.token) return;
@@ -259,6 +263,13 @@ export default function DonationInboxScreen() {
         Review each offer and accept it. At pickup, the business displays a one-time QR code for your nonprofit to scan and confirm receipt.
       </ThemedText>
 
+      <View style={styles.pickupCard}>
+        <ThemedText type="smallBold">Pickup QR scanner</ThemedText>
+        <ThemedText type="small">
+          {acceptedCount > 0 ? `${acceptedCount} accepted donation${acceptedCount === 1 ? ' is' : 's are'} ready to scan below.` : 'Accept an incoming donation first. Its camera scanner will then appear below for pickup.'}
+        </ThemedText>
+      </View>
+
       <View style={styles.metricsRow}>
         <View style={styles.metricCard}>
           <ThemedText type="small">Total</ThemedText>
@@ -326,7 +337,9 @@ export default function DonationInboxScreen() {
               ) : null}
 
               {status === 'accepted' ? (
-                <>
+                <View style={styles.handoffCard}>
+                  <ThemedText type="smallBold">Ready for pickup confirmation</ThemedText>
+                  <ThemedText type="small">Use the camera to scan the one-time QR shown on the business account.</ThemedText>
                   {scannerDonationId === donationId ? (
                     <View style={styles.scannerCard}>
                       <CameraView
@@ -355,7 +368,7 @@ export default function DonationInboxScreen() {
                     autoCapitalize="none"
                   />
                   <Pressable style={styles.secondaryBtn} onPress={() => handleOpenScanner(donationId)}>
-                    <ThemedText type="smallBold">Scan QR code</ThemedText>
+                    <ThemedText type="smallBold">Open pickup QR scanner</ThemedText>
                   </Pressable>
                   <View style={styles.certificationRow}>
                     <Switch
@@ -378,7 +391,7 @@ export default function DonationInboxScreen() {
                     disabled={busyId === donationId || !certifiedByDonationId[donationId]}>
                     {busyId === donationId ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Confirm handoff</ThemedText>}
                   </Pressable>
-                </>
+                </View>
               ) : null}
 
               {status === 'received' ? (
@@ -418,6 +431,22 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     backgroundColor: '#FAFCFF',
     gap: 2,
+  },
+  pickupCard: {
+    borderWidth: 1,
+    borderColor: '#BFD4EA',
+    borderRadius: Spacing.three,
+    padding: Spacing.three,
+    backgroundColor: '#F3F8FF',
+    gap: Spacing.one,
+  },
+  handoffCard: {
+    borderWidth: 1,
+    borderColor: '#9FC8B4',
+    borderRadius: Spacing.three,
+    padding: Spacing.three,
+    backgroundColor: '#F1F9F5',
+    gap: Spacing.two,
   },
   card: {
     borderWidth: 1,

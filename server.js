@@ -3065,6 +3065,15 @@ app.post('/api/donations/:id/handoff-token', async (req, res) => {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 1000 * 60 * 60).toISOString();
 
+    const { error: previousTokenError } = await supabase
+      .from('donation_handoffs')
+      .delete()
+      .eq('donationId', req.params.id)
+      .eq('usedAt', '');
+    if (previousTokenError) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(previousTokenError) });
+    }
+
     const { error } = await supabase.from('donation_handoffs').insert([{
       id: crypto.randomUUID(),
       donationId: req.params.id,

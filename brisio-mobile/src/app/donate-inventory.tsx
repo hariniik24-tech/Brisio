@@ -253,6 +253,11 @@ export default function DonateInventoryScreen() {
         <ThemedText type="small">Recorded value: {formatCurrency(summary.estimatedInventoryValue)}</ThemedText>
       </View>
 
+      <View style={styles.pickupCard}>
+        <ThemedText type="smallBold">Pickup QR</ThemedText>
+        <ThemedText type="small">After a nonprofit accepts a donation, open that record and tap Show one-time pickup QR. The nonprofit scans it at pickup to confirm receipt.</ThemedText>
+      </View>
+
       <View style={styles.actionRow}>
         <Pressable style={[styles.secondaryBtn, styles.actionBtn]} onPress={loadRecords} disabled={loading}>
           <ThemedText type="smallBold">Refresh</ThemedText>
@@ -337,23 +342,30 @@ export default function DonateInventoryScreen() {
                 </View>
               </View>
             ) : record.status === 'posted' ? (
-              <View style={styles.actionRow}>
-                <Pressable style={[styles.secondaryBtn, styles.actionBtn]} onPress={() => startEditing(record)} disabled={Boolean(deletingId)}>
-                  <ThemedText type="smallBold">Edit record</ThemedText>
-                </Pressable>
-                <Pressable style={[styles.deleteBtn, styles.actionBtn, deletingId === record.id && styles.disabledBtn]} onPress={() => confirmDelete(record)} disabled={Boolean(deletingId)}>
-                  {deletingId === record.id ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold" style={styles.deleteText}>Delete</ThemedText>}
-                </Pressable>
-              </View>
+              <>
+                <ThemedText type="small" style={styles.helperText}>
+                  {record.recipientOrgId ? 'Waiting for the nonprofit to accept. The pickup QR will appear here after acceptance.' : 'Assign a nonprofit first. After it accepts, the pickup QR will appear here.'}
+                </ThemedText>
+                <View style={styles.actionRow}>
+                  <Pressable style={[styles.secondaryBtn, styles.actionBtn]} onPress={() => startEditing(record)} disabled={Boolean(deletingId)}>
+                    <ThemedText type="smallBold">Edit record</ThemedText>
+                  </Pressable>
+                  <Pressable style={[styles.deleteBtn, styles.actionBtn, deletingId === record.id && styles.disabledBtn]} onPress={() => confirmDelete(record)} disabled={Boolean(deletingId)}>
+                    {deletingId === record.id ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold" style={styles.deleteText}>Delete</ThemedText>}
+                  </Pressable>
+                </View>
+              </>
             ) : null}
 
             {record.status === 'accepted' ? (
-              <>
+              <View style={styles.handoffCard}>
+                <ThemedText type="smallBold">Ready for pickup</ThemedText>
+                <ThemedText type="small">Show this one-time QR to the nonprofit at pickup. It expires after one hour.</ThemedText>
                 <Pressable
-                  style={[styles.secondaryBtn, handoffBusyId === record.id && styles.disabledBtn]}
+                  style={[styles.primaryBtn, handoffBusyId === record.id && styles.disabledBtn]}
                   onPress={() => generateHandoffToken(record.id)}
                   disabled={handoffBusyId === record.id}>
-                  {handoffBusyId === record.id ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Generate handoff QR</ThemedText>}
+                  {handoffBusyId === record.id ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">{handoffTokenById[record.id] ? 'Replace pickup QR' : 'Show one-time pickup QR'}</ThemedText>}
                 </Pressable>
                 {!!handoffTokenById[record.id] ? (
                   <View style={styles.qrBox}>
@@ -361,7 +373,7 @@ export default function DonateInventoryScreen() {
                     <ThemedText type="small">Expires: {handoffExpiresAtById[record.id]}</ThemedText>
                   </View>
                 ) : null}
-              </>
+              </View>
             ) : null}
 
             {record.status === 'received' ? (
@@ -383,6 +395,8 @@ const styles = StyleSheet.create({
   helperText: { color: '#5B6778', lineHeight: 18 },
   createBtn: { borderWidth: 1, borderColor: '#476C9D', borderRadius: Spacing.three, paddingHorizontal: Spacing.three, paddingVertical: Spacing.two, backgroundColor: '#CFE1F8' },
   summaryCard: { borderWidth: 1, borderColor: '#BFD4EA', borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two, backgroundColor: '#F3F8FF' },
+  pickupCard: { borderWidth: 1, borderColor: '#BFD4EA', borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.one, backgroundColor: '#F3F8FF' },
+  handoffCard: { borderWidth: 1, borderColor: '#9FC8B4', borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two, backgroundColor: '#F1F9F5' },
   metricsRow: { flexDirection: 'row', gap: Spacing.one },
   metric: { flex: 1, gap: 2 },
   actionRow: { flexDirection: 'row', gap: Spacing.two },

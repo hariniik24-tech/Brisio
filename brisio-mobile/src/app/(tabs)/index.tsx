@@ -279,14 +279,14 @@ export default function HomeScreen() {
                 {session.user.role === 'business' ? (
                   <Link href="/donate-inventory" asChild>
                     <Pressable style={styles.secondaryBtn}>
-                      <ThemedText type="smallBold">Open donate inventory</ThemedText>
+                      <ThemedText type="smallBold">Donation records & pickup QR</ThemedText>
                     </Pressable>
                   </Link>
                 ) : null}
                 {session.user.role === 'organization' ? (
                   <Link href="/donation-inbox" asChild>
                     <Pressable style={styles.secondaryBtn}>
-                      <ThemedText type="smallBold">Open donation inbox & QR scanner</ThemedText>
+                      <ThemedText type="smallBold">Donation inbox & pickup QR scanner</ThemedText>
                     </Pressable>
                   </Link>
                 ) : null}

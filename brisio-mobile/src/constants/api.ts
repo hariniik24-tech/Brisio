@@ -78,6 +78,7 @@ export type ApiDonation = {
   quantity: number;
   unit: string;
   conditionNotes: string;
+  estimatedUnitValue?: number;
   estimatedTotalValue?: number;
   createdAt: string;
   updatedAt: string;
@@ -367,6 +368,26 @@ export async function getDonationById(token: string, donationId: string) {
     `/api/donations/${encodeURIComponent(donationId)}`,
     { token }
   );
+}
+
+export async function updateDonationRecord(
+  token: string,
+  donationId: string,
+  input: {
+    productName: string;
+    productBrand: string;
+    productCategory: string;
+    quantity: number;
+    unit: string;
+    estimatedUnitValue?: number;
+    conditionNotes: string;
+  }
+) {
+  return apiRequest<{ success: true; donation: ApiDonation }>(`/api/donations/${encodeURIComponent(donationId)}`, {
+    method: 'PATCH',
+    token,
+    body: input,
+  });
 }
 
 export async function acceptDonation(token: string, donationId: string, note?: string) {

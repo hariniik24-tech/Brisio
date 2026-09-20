@@ -2686,6 +2686,89 @@ app.get('/api/donations/:id', async (req, res) => {
   }
 });
 
+app.patch('/api/donations/:id', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+    if (req.user.role !== 'business') {
+      return res.status(403).json({ success: false, error: 'Only business users can edit donation records.' });
+    }
+
+    const donation = await getDonationById(req.params.id);
+    if (!donation) {
+      return res.status(404).json({ success: false, error: 'Donation not found' });
+    }
+    const createdByUserId = String(getFirstDefined(donation, ['createdByUserId', 'createdbyuserid']));
+    if (createdByUserId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'You can edit only donation records you created.' });
+    }
+    if (String(getFirstDefined(donation, ['status'])) !== 'posted') {
+      return res.status(409).json({ success: false, error: 'Only records awaiting review can be edited.' });
+    }
+
+    const input = req.body || {};
+    const productName = String(input.productName || '').trim();
+    const productBrand = String(input.productBrand || '').trim();
+    const productCategory = String(input.productCategory || 'food').trim() || 'food';
+    const quantity = Number(input.quantity);
+    const unit = String(input.unit || '').trim();
+    const estimatedUnitValue = input.estimatedUnitValue === '' || input.estimatedUnitValue === null || input.estimatedUnitValue === undefined
+      ? null
+      : Number(input.estimatedUnitValue);
+    const conditionNotes = String(input.conditionNotes || '').trim();
+
+    if (!productName || !unit || !Number.isFinite(quantity) || quantity <= 0) {
+      return res.status(400).json({ success: false, error: 'Product name, unit, and a positive quantity are required.' });
+    }
+    if (estimatedUnitValue !== null && (!Number.isFinite(estimatedUnitValue) || estimatedUnitValue < 0)) {
+      return res.status(400).json({ success: false, error: 'Estimated unit value must be zero or greater.' });
+    }
+
+    const estimatedTotalValue = estimatedUnitValue === null ? null : Number((estimatedUnitValue * quantity).toFixed(2));
+    const now = new Date().toISOString();
+    const updates = {
+      productName,
+      productname: productName,
+      productBrand,
+      productbrand: productBrand,
+      productCategory,
+      productcategory: productCategory,
+      quantity,
+      unit,
+      estimatedUnitValue,
+      estimatedunitvalue: estimatedUnitValue,
+      estimatedTotalValue,
+      estimatedtotalvalue: estimatedTotalValue,
+      conditionNotes,
+      conditionnotes: conditionNotes,
+      updatedAt: now,
+      updatedat: now,
+    };
+    const { data: updated, error } = await supabase
+      .from('donation_records')
+      .update(updates)
+      .eq('id', req.params.id)
+      .eq('createdByUserId', req.user.id)
+      .select('*')
+      .single();
+    if (error) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(error) });
+    }
+
+    await appendDonationEvent({
+      donationId: req.params.id,
+      eventType: 'updated',
+      actorUserId: req.user.id,
+      actorRole: req.user.role,
+      payload: { productName, productBrand, productCategory, quantity, unit, estimatedUnitValue, conditionNotes },
+    });
+
+    res.json({ success: true, donation: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('/api/donations/:id/acknowledgment', async (req, res) => {
   try {
     await requireAuth(req, res, () => {});

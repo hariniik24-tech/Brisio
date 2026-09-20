@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
 import { Href, useFocusEffect, useRouter } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -10,12 +10,25 @@ import {
   generateDonationHandoffToken,
   getDonationImpactSummary,
   getDonations,
+  updateDonationRecord,
   type ApiDonation,
 } from '@/constants/api';
 import { Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
 
 const HANDOFF_QR_PREFIX = 'BRISIO_HANDOFF:';
+const INPUT_PLACEHOLDER_COLOR = '#6A7685';
+
+type DonationEdit = {
+  id: string;
+  productName: string;
+  productBrand: string;
+  productCategory: string;
+  quantity: string;
+  unit: string;
+  estimatedUnitValue: string;
+  conditionNotes: string;
+};
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
@@ -36,6 +49,8 @@ export default function DonateInventoryScreen() {
   const [handoffBusyId, setHandoffBusyId] = useState('');
   const [handoffTokenById, setHandoffTokenById] = useState<Record<string, string>>({});
   const [handoffExpiresAtById, setHandoffExpiresAtById] = useState<Record<string, string>>({});
+  const [editing, setEditing] = useState<DonationEdit | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
   const [summary, setSummary] = useState({
     itemsDonated: 0,
     estimatedInventoryValue: 0,
@@ -106,6 +121,55 @@ export default function DonateInventoryScreen() {
       setMessage(err instanceof Error ? err.message : 'Could not export your records.');
     } finally {
       setBusy(false);
+    }
+  }
+
+  function startEditing(record: ApiDonation) {
+    setEditing({
+      id: record.id,
+      productName: record.productName || '',
+      productBrand: record.productBrand || '',
+      productCategory: record.productCategory || 'food',
+      quantity: String(record.quantity),
+      unit: record.unit || 'units',
+      estimatedUnitValue: typeof record.estimatedUnitValue === 'number' ? String(record.estimatedUnitValue) : '',
+      conditionNotes: record.conditionNotes || '',
+    });
+    setMessage('');
+  }
+
+  async function saveEditing() {
+    if (!session.token || !editing || editBusy) return;
+    const quantity = Number(editing.quantity);
+    const estimatedUnitValue = editing.estimatedUnitValue.trim() === '' ? undefined : Number(editing.estimatedUnitValue);
+    if (!editing.productName.trim() || !editing.unit.trim() || !Number.isFinite(quantity) || quantity <= 0) {
+      setMessage('Product name, quantity greater than zero, and quantity type are required.');
+      return;
+    }
+    if (estimatedUnitValue !== undefined && (!Number.isFinite(estimatedUnitValue) || estimatedUnitValue < 0)) {
+      setMessage('Estimated value must be zero or greater.');
+      return;
+    }
+
+    setEditBusy(true);
+    setMessage('');
+    try {
+      await updateDonationRecord(session.token, editing.id, {
+        productName: editing.productName.trim(),
+        productBrand: editing.productBrand.trim(),
+        productCategory: editing.productCategory.trim() || 'food',
+        quantity,
+        unit: editing.unit.trim(),
+        estimatedUnitValue,
+        conditionNotes: editing.conditionNotes.trim(),
+      });
+      setEditing(null);
+      await loadRecords();
+      setMessage('Donation record updated.');
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Could not update the donation record.');
+    } finally {
+      setEditBusy(false);
     }
   }
 
@@ -186,6 +250,43 @@ export default function DonateInventoryScreen() {
             <ThemedText type="small">Created: {formatDate(record.createdAt)}</ThemedText>
             {typeof record.estimatedTotalValue === 'number' ? <ThemedText type="small">Recorded value: {formatCurrency(record.estimatedTotalValue)}</ThemedText> : null}
 
+            {editing?.id === record.id ? (
+              <View style={styles.editForm}>
+                <ThemedText type="smallBold">Product name</ThemedText>
+                <TextInput style={styles.input} value={editing.productName} onChangeText={(productName) => setEditing({ ...editing, productName })} placeholder="Product name" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
+                <ThemedText type="smallBold">Brand</ThemedText>
+                <TextInput style={styles.input} value={editing.productBrand} onChangeText={(productBrand) => setEditing({ ...editing, productBrand })} placeholder="Brand" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
+                <ThemedText type="smallBold">Category</ThemedText>
+                <TextInput style={styles.input} value={editing.productCategory} onChangeText={(productCategory) => setEditing({ ...editing, productCategory })} autoCapitalize="words" placeholder="Food" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
+                <View style={styles.actionRow}>
+                  <View style={styles.editField}>
+                    <ThemedText type="smallBold">Quantity</ThemedText>
+                    <TextInput style={styles.input} value={editing.quantity} onChangeText={(quantity) => setEditing({ ...editing, quantity })} keyboardType="decimal-pad" placeholder="12" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
+                  </View>
+                  <View style={styles.editField}>
+                    <ThemedText type="smallBold">Quantity type</ThemedText>
+                    <TextInput style={styles.input} value={editing.unit} onChangeText={(unit) => setEditing({ ...editing, unit })} placeholder="Cases" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
+                  </View>
+                </View>
+                <ThemedText type="smallBold">Estimated value per unit</ThemedText>
+                <TextInput style={styles.input} value={editing.estimatedUnitValue} onChangeText={(estimatedUnitValue) => setEditing({ ...editing, estimatedUnitValue })} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
+                <ThemedText type="smallBold">Condition notes</ThemedText>
+                <TextInput style={[styles.input, styles.textArea]} value={editing.conditionNotes} onChangeText={(conditionNotes) => setEditing({ ...editing, conditionNotes })} multiline placeholder="Sealed case, best-by date" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
+                <View style={styles.actionRow}>
+                  <Pressable style={[styles.primaryBtn, styles.actionBtn, editBusy && styles.disabledBtn]} onPress={saveEditing} disabled={editBusy}>
+                    {editBusy ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Save changes</ThemedText>}
+                  </Pressable>
+                  <Pressable style={[styles.secondaryBtn, styles.actionBtn]} onPress={() => setEditing(null)} disabled={editBusy}>
+                    <ThemedText type="smallBold">Cancel</ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+            ) : record.status === 'posted' ? (
+              <Pressable style={styles.secondaryBtn} onPress={() => startEditing(record)}>
+                <ThemedText type="smallBold">Edit record</ThemedText>
+              </Pressable>
+            ) : null}
+
             {record.status === 'accepted' ? (
               <>
                 <Pressable
@@ -232,6 +333,10 @@ const styles = StyleSheet.create({
   recordHeading: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   recordName: { flex: 1 },
   status: { textTransform: 'capitalize', color: '#355A48' },
+  editForm: { gap: Spacing.one, paddingTop: Spacing.two },
+  editField: { flex: 1, gap: Spacing.one },
+  input: { borderWidth: 1, borderColor: '#C3CDDB', borderRadius: Spacing.three, paddingHorizontal: Spacing.three, paddingVertical: 12, fontSize: 14, backgroundColor: '#FFFFFF', color: '#1C2735' },
+  textArea: { minHeight: 84, textAlignVertical: 'top' },
   qrBox: { alignItems: 'center', gap: Spacing.one, padding: Spacing.two, borderRadius: Spacing.three, backgroundColor: '#F3F8FF' },
   secondaryBtn: { alignItems: 'center', borderRadius: Spacing.three, paddingVertical: Spacing.three, paddingHorizontal: Spacing.two, borderWidth: 1, borderColor: '#CDD5E1', backgroundColor: '#F7F9FC' },
   primaryBtn: { alignItems: 'center', borderRadius: Spacing.three, paddingVertical: Spacing.three, borderWidth: 1, borderColor: '#476C9D', backgroundColor: '#CFE1F8' },

@@ -1334,6 +1334,10 @@ function buildAIInsights(listings, role = 'member') {
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/support', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'support.html'));
+});
+
 const limiter = rateLimit({ windowMs: 60_000, max: 120, message: { error: 'Too many requests, slow down.' } });
 app.use('/api/', limiter);
 

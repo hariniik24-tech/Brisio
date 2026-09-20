@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Contact Brisio support for help with accounts, listings, donation records, and app access." />
+  <title>Brisio Support</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #182434;
+      --muted: #5d6b7b;
+      --line: #d8e2ea;
+      --paper: #ffffff;
+      --wash: #edf7f8;
+      --teal: #176f78;
+      --teal-dark: #10545c;
+      --coral: #dc7447;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        linear-gradient(135deg, rgba(23, 111, 120, 0.08), transparent 45%),
+        repeating-linear-gradient(90deg, transparent 0 47px, rgba(24, 36, 52, 0.025) 48px),
+        #f8fbfc;
+      font-family: "DM Sans", sans-serif;
+      letter-spacing: 0;
+    }
+
+    a { color: inherit; }
+
+    .shell {
+      width: min(100% - 32px, 920px);
+      margin: 0 auto;
+      padding: 28px 0 48px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .mark {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      color: white;
+      background: var(--teal);
+      font: 800 20px/1 "Manrope", sans-serif;
+      box-shadow: 5px 5px 0 #b9dadd;
+    }
+
+    .wordmark {
+      font: 800 22px/1 "Manrope", sans-serif;
+    }
+
+    .tagline {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--teal-dark);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .status::before {
+      content: "";
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #2f9368;
+    }
+
+    main { padding-top: 64px; }
+
+    .eyebrow {
+      margin: 0 0 12px;
+      color: var(--coral);
+      font-size: 13px;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 680px;
+      margin: 0;
+      font: 800 clamp(38px, 7vw, 68px)/1.02 "Manrope", sans-serif;
+    }
+
+    .intro {
+      max-width: 620px;
+      margin: 20px 0 38px;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.6;
+    }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .contact {
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+      text-decoration: none;
+      transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    .contact:hover,
+    .contact:focus-visible {
+      border-color: var(--teal);
+      transform: translateY(-3px);
+      box-shadow: 0 14px 28px rgba(24, 52, 65, 0.09);
+      outline: none;
+    }
+
+    .contact-label {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .contact-value {
+      overflow-wrap: anywhere;
+      font: 700 clamp(19px, 3vw, 27px)/1.25 "Manrope", sans-serif;
+      color: var(--teal-dark);
+    }
+
+    .details {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 32px;
+      margin-top: 52px;
+      padding-top: 32px;
+      border-top: 1px solid var(--line);
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font: 800 21px/1.3 "Manrope", sans-serif;
+    }
+
+    p, li { line-height: 1.6; }
+    .details p, .details li { color: var(--muted); }
+    ul { margin: 10px 0 0; padding-left: 20px; }
+
+    footer {
+      margin-top: 54px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    @media (max-width: 640px) {
+      header { align-items: flex-start; }
+      .status { margin-top: 5px; }
+      main { padding-top: 44px; }
+      .contact-grid, .details { grid-template-columns: 1fr; }
+      .contact { min-height: 150px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <a class="brand" href="/" aria-label="Brisio home">
+        <span class="mark" aria-hidden="true">B</span>
+        <span>
+          <span class="wordmark">Brisio</span>
+          <span class="tagline">Bridging resources. Strengthening communities.</span>
+        </span>
+      </a>
+      <span class="status">Support available</span>
+    </header>
+
+    <main>
+      <p class="eyebrow">Brisio Support</p>
+      <h1>How can we help?</h1>
+      <p class="intro">Get help with your account, listings, donation records, barcode scanning, or nonprofit coordination. Include the screen name and a short description so we can respond efficiently.</p>
+
+      <section class="contact-grid" aria-label="Support contact options">
+        <a class="contact" href="mailto:brisiohelp@gmail.com?subject=Brisio%20support%20request">
+          <span class="contact-label">Email support</span>
+          <span class="contact-value">brisiohelp@gmail.com</span>
+        </a>
+        <a class="contact" href="tel:+15315419424">
+          <span class="contact-label">Call support</span>
+          <span class="contact-value">531-541-9424</span>
+        </a>
+      </section>
+
+      <section class="details">
+        <div>
+          <h2>What to include</h2>
+          <ul>
+            <li>The email address associated with your Brisio account</li>
+            <li>The screen or feature where the issue occurred</li>
+            <li>A short description and screenshot, when helpful</li>
+          </ul>
+        </div>
+        <div>
+          <h2>Account deletion</h2>
+          <p>You can delete your account from within the Brisio app. For assistance with account access or deletion, contact support using the email above.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>&copy; 2026 Brisio. Support for businesses and nonprofit organizations.</footer>
+  </div>
+</body>
+</html>

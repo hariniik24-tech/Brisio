@@ -883,6 +883,7 @@ app.get('/api/organizations', requireAuth, (req, res) => {
 app.get('/api/listings', requireAuth, (req, res) => {
   const { type, category } = req.query;
   const rows = getVisibleActiveListings(req.user).filter((listing) => {
+    if (listing.type !== 'supply') return false;
     if (type && listing.type !== type) return false;
     if (category && listing.category !== category) return false;
     return true;
@@ -914,11 +915,11 @@ app.post('/api/listings', requireAuth, (req, res) => {
   }
 
   const userRole = req.user.role;
-  if (!['business', 'organization'].includes(userRole)) {
-    return res.status(403).json({ success: false, error: 'Only business and organization users can create listings' });
+  if (userRole !== 'business') {
+    return res.status(403).json({ success: false, error: 'Only business accounts can create listings' });
   }
 
-  const type = userRole === 'business' ? 'supply' : 'demand';
+  const type = 'supply';
   const now = new Date().toISOString();
   const detectedCategory = detectCategory(`${req.user.organizationName} ${description}`);
   const finalCategory = category === 'other' ? detectedCategory : category;
@@ -939,10 +940,6 @@ app.post('/api/listings', requireAuth, (req, res) => {
   }
 
   const urgency = String(urgencyLevel || '').toLowerCase();
-  if (userRole === 'organization' && urgency && !['low', 'medium', 'high', 'critical'].includes(urgency)) {
-    return res.status(400).json({ success: false, error: 'urgencyLevel must be low, medium, high, or critical' });
-  }
-
   const privateFlag = isPrivate ? 1 : 0;
   if (privateFlag === 1 && userRole !== 'business') {
     return res.status(403).json({ success: false, error: 'Only businesses can create private offers' });
@@ -977,9 +974,7 @@ app.post('/api/listings', requireAuth, (req, res) => {
 
   const id = crypto.randomUUID();
   const businessName = req.user.organizationName || req.user.displayName;
-  const urgent = userRole === 'organization'
-    ? Number(urgency === 'high' || urgency === 'critical')
-    : Number(URGENCY_WORDS.some((word) => normalizedDescription.toLowerCase().includes(word)));
+  const urgent = Number(URGENCY_WORDS.some((word) => normalizedDescription.toLowerCase().includes(word)));
 
   db.prepare(`
     INSERT INTO listings (
@@ -1002,7 +997,7 @@ app.post('/api/listings', requireAuth, (req, res) => {
     req.user.id,
     parsedDeliveryHours,
     normalizedClosesAt,
-    userRole === 'organization' ? (urgency || 'medium') : 'normal',
+    'normal',
     privateFlag,
     privateFlag === 1 ? String(targetOrganizationId).trim() : '',
     String(resourceName || '').trim(),

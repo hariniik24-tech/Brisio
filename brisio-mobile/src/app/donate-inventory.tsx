@@ -318,7 +318,7 @@ export default function DonateInventoryScreen() {
                 <TextInput style={[styles.input, styles.textArea]} value={editing.conditionNotes} onChangeText={(conditionNotes) => setEditing({ ...editing, conditionNotes })} multiline placeholder="Sealed case, best-by date" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
                 <ThemedText type="smallBold">Recipient nonprofit</ThemedText>
                 {organizations.length === 0 ? (
-                  <ThemedText type="small">No nonprofits currently have an active resource request. Keep this record unassigned for now.</ThemedText>
+                  <ThemedText type="small">No nonprofit accounts are available. Keep this record unassigned for now.</ThemedText>
                 ) : (
                   <View style={styles.orgList}>
                     {organizations.map((organization) => (

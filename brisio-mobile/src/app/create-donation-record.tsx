@@ -331,8 +331,8 @@ export default function CreateDonationRecordScreen() {
         <ActivityIndicator size="small" />
       ) : organizations.length === 0 ? (
         <View style={styles.card}>
-          <ThemedText type="smallBold">No eligible nonprofit requests</ThemedText>
-          <ThemedText type="small">You can save this record unassigned. A nonprofit can be selected after it posts an active resource request.</ThemedText>
+          <ThemedText type="smallBold">No nonprofit accounts available</ThemedText>
+          <ThemedText type="small">You can save this record unassigned and select a nonprofit later.</ThemedText>
         </View>
       ) : (
         <View style={styles.orgList}>

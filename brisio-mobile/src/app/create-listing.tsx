@@ -41,9 +41,7 @@ export default function CreateListingScreen() {
         description: description.trim(),
         contact: contact.trim(),
         location: session.user.location,
-        ...(session.user.role === 'business' && deliveryTiming.trim()
-          ? { availabilityNotes: deliveryTiming.trim() }
-          : {}),
+        ...(deliveryTiming.trim() ? { availabilityNotes: deliveryTiming.trim() } : {}),
       });
       router.replace('/');
     } catch (err) {
@@ -66,6 +64,23 @@ export default function CreateListingScreen() {
     );
   }
 
+  if (session.user.role !== 'business') {
+    return (
+      <StackScreenShell>
+        <Pressable onPress={() => router.replace('/')} style={styles.backBtn} hitSlop={10}>
+          <ThemedText type="smallBold">Back to Home</ThemedText>
+        </Pressable>
+        <ThemedText type="subtitle">Business listings</ThemedText>
+        <ThemedText type="small">
+          Only business accounts create listings. Nonprofit accounts browse business offers and choose whether to accept or decline them.
+        </ThemedText>
+        <Pressable style={styles.primaryBtn} onPress={() => router.replace('/explore')}>
+          <ThemedText type="smallBold">Browse business listings</ThemedText>
+        </Pressable>
+      </StackScreenShell>
+    );
+  }
+
   return (
     <StackScreenShell>
       <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={10}>
@@ -74,7 +89,7 @@ export default function CreateListingScreen() {
 
       <ThemedText type="subtitle">Create listing</ThemedText>
       <ThemedText type="small" style={styles.helperText}>
-        Share what is available or describe what your organization needs.
+        Share a resource that is available for nonprofits.
       </ThemedText>
       <ThemedText type="smallBold">
         Posting as {session.user.organizationName || session.user.displayName}
@@ -113,19 +128,15 @@ export default function CreateListingScreen() {
         onChangeText={setContact}
       />
 
-      {session.user.role === 'business' ? (
-        <>
-          <ThemedText type="smallBold">Delivery timing</ThemedText>
-          <TextInput
-            accessibilityLabel="Delivery or pickup timing"
-            style={styles.input}
-            placeholder="Today at 4 PM, in 30 minutes, tomorrow morning..."
-            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-            value={deliveryTiming}
-            onChangeText={setDeliveryTiming}
-          />
-        </>
-      ) : null}
+      <ThemedText type="smallBold">Delivery timing</ThemedText>
+      <TextInput
+        accessibilityLabel="Delivery or pickup timing"
+        style={styles.input}
+        placeholder="Today at 4 PM, in 30 minutes, tomorrow morning..."
+        placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+        value={deliveryTiming}
+        onChangeText={setDeliveryTiming}
+      />
 
       <ThemedText type="small" style={styles.helperText}>
         Your business name and account address will be added automatically.

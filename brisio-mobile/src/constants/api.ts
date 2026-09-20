@@ -318,6 +318,17 @@ export async function deleteListing(token: string, listingId: string) {
   });
 }
 
+export async function respondToListing(token: string, listingId: string, action: 'accept' | 'decline') {
+  return apiRequest<{ success: true; action: 'accept' | 'decline'; donationId: string }>(
+    `/api/listings/${encodeURIComponent(listingId)}/respond`,
+    {
+      method: 'POST',
+      token,
+      body: { action },
+    }
+  );
+}
+
 export async function lookupProductByBarcode(token: string, input: { barcode: string; format?: string }) {
   return apiRequest<{ success: true; product: ApiScannedProduct; source: string }>('/api/products/lookup', {
     method: 'POST',

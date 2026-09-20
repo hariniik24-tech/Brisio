@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Link } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ApiListing, getListings } from '@/constants/api';
+import { ApiListing, getListings, respondToListing } from '@/constants/api';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
 import { useTheme } from '@/hooks/use-theme';
@@ -17,7 +18,9 @@ function ExploreContent() {
   const theme = useTheme();
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [busyListingId, setBusyListingId] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
   const [listings, setListings] = useState<ApiListing[]>([]);
 
   const insets = {
@@ -50,6 +53,26 @@ function ExploreContent() {
       setError(err instanceof Error ? err.message : 'Could not load listings');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResponse(listing: ApiListing, action: 'accept' | 'decline') {
+    if (!session.token || busyListingId) return;
+    setBusyListingId(listing.id);
+    setError('');
+    setMessage('');
+    try {
+      await respondToListing(session.token, listing.id, action);
+      setListings((current) => current.filter((item) => item.id !== listing.id));
+      setMessage(
+        action === 'accept'
+          ? `${listing.businessName}'s listing is accepted and ready in your pickup inbox.`
+          : `${listing.businessName}'s listing was declined.`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Could not ${action} this listing.`);
+    } finally {
+      setBusyListingId('');
     }
   }
 
@@ -97,7 +120,9 @@ function ExploreContent() {
         <ThemedView style={styles.titleContainer}>
           <ThemedText type="subtitle">Explore Listings</ThemedText>
           <ThemedText style={styles.centerText} themeColor="textSecondary">
-            Browse active offers and needs posted by the Brisio community.
+            {session.user?.role === 'organization'
+              ? 'Find resources offered by businesses, then accept or decline each match.'
+              : 'Browse active resource offers from Brisio businesses.'}
           </ThemedText>
         </ThemedView>
 
@@ -120,6 +145,14 @@ function ExploreContent() {
               <Pressable style={styles.refreshBtn} onPress={loadData}>
                 <ThemedText type="smallBold">Refresh</ThemedText>
               </Pressable>
+              {!!message && <ThemedText style={styles.successText}>{message}</ThemedText>}
+              {!!message && session.user?.role === 'organization' ? (
+                <Link href="/donation-inbox" asChild>
+                  <Pressable style={styles.inboxBtn}>
+                    <ThemedText type="smallBold">Open pickup inbox</ThemedText>
+                  </Pressable>
+                </Link>
+              ) : null}
               {!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
             </ThemedView>
 
@@ -136,14 +169,38 @@ function ExploreContent() {
               ) : (
                 filtered.slice(0, 25).map((item) => (
                   <ThemedView key={item.id} type="backgroundElement" style={styles.listingCard}>
-                    <ThemedText type="smallBold">Business: {item.businessName}</ThemedText>
+                    <ThemedText type="smallBold">Offered by {item.businessName}</ThemedText>
                     <ThemedText type="small">
-                      {item.type === 'supply' ? 'Available resource' : 'Resource request'} |{' '}
+                      Available resource |{' '}
                       <ThemedText type="small" style={styles.categoryText}>{item.category}</ThemedText>
                     </ThemedText>
                     <ThemedText type="small">{item.description}</ThemedText>
                     {!!item.availabilityNotes && <ThemedText type="small">Timing: {item.availabilityNotes}</ThemedText>}
                     <ThemedText type="small">Address: {item.location || 'Address not set'}</ThemedText>
+                    {session.user?.role === 'organization' ? (
+                      <View style={styles.actionRow}>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Accept listing from ${item.businessName}`}
+                          style={[styles.acceptBtn, busyListingId === item.id && styles.disabledBtn]}
+                          onPress={() => handleResponse(item, 'accept')}
+                          disabled={Boolean(busyListingId)}>
+                          {busyListingId === item.id ? (
+                            <ActivityIndicator size="small" />
+                          ) : (
+                            <ThemedText type="smallBold">Accept</ThemedText>
+                          )}
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Decline listing from ${item.businessName}`}
+                          style={[styles.declineBtn, busyListingId === item.id && styles.disabledBtn]}
+                          onPress={() => handleResponse(item, 'decline')}
+                          disabled={Boolean(busyListingId)}>
+                          <ThemedText type="smallBold">Decline</ThemedText>
+                        </Pressable>
+                      </View>
+                    ) : null}
                   </ThemedView>
                 ))
               )}
@@ -223,6 +280,45 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     gap: Spacing.one,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    marginTop: Spacing.two,
+  },
+  acceptBtn: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Spacing.three,
+    borderWidth: 1,
+    borderColor: '#7EA58F',
+    backgroundColor: '#E8F4ED',
+  },
+  declineBtn: {
+    flex: 1,
+    minHeight: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: Spacing.three,
+    borderWidth: 1,
+    borderColor: '#C7CED8',
+    backgroundColor: '#F5F7FA',
+  },
+  inboxBtn: {
+    alignItems: 'center',
+    borderRadius: Spacing.three,
+    paddingVertical: Spacing.two,
+    borderWidth: 1,
+    borderColor: '#8FAACB',
+    backgroundColor: '#EAF2FC',
+  },
+  disabledBtn: {
+    opacity: 0.55,
+  },
+  successText: {
+    color: '#256A4A',
   },
   errorText: {
     color: '#B54840',

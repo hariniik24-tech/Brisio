@@ -417,6 +417,15 @@ function normalizeGtinFromBarcode(barcode) {
   return normalized.padStart(14, '0');
 }
 
+function listingResponseDonationId(listingId, organizationId) {
+  const digest = crypto
+    .createHash('sha256')
+    .update(`${listingId}:${organizationId}`)
+    .digest('hex')
+    .slice(0, 32);
+  return `don_listing_${digest}`;
+}
+
 async function appendDonationEvent({ donationId, eventType, actorUserId, actorRole, payload = {} }) {
   const createdAt = new Date().toISOString();
   await supabase.from('donation_events').insert([{
@@ -1678,7 +1687,20 @@ app.get('/api/listings', async (req, res, next) => {
     await requireAuth(req, res, () => {});
     if (!req.user) return;
 
-    const listings = await getVisibleActiveListings(req.user);
+    let listings = (await getVisibleActiveListings(req.user))
+      .filter((listing) => listing.type === 'supply');
+    if (req.user.role === 'organization' && listings.length > 0) {
+      const responseIds = listings.map((listing) => listingResponseDonationId(listing.id, req.user.id));
+      const { data: responses, error: responseError } = await supabase
+        .from('donation_records')
+        .select('id')
+        .in('id', responseIds);
+      if (responseError && !isMissingDonationRecordsTableError(responseError)) {
+        throw responseError;
+      }
+      const respondedIds = new Set((responses || []).map((response) => response.id));
+      listings = listings.filter((listing) => !respondedIds.has(listingResponseDonationId(listing.id, req.user.id)));
+    }
     res.json({ success: true, listings });
   } catch (err) {
     console.error('Get listings error:', err);
@@ -1690,9 +1712,12 @@ app.post('/api/listings', async (req, res, next) => {
   try {
     await requireAuth(req, res, () => {});
     if (!req.user) return;
+    if (req.user.role !== 'business') {
+      return res.status(403).json({ success: false, error: 'Only business accounts can create listings.' });
+    }
 
     const { category, description, contact, urgent, deliverWithinHours, offerClosesAt, urgencyLevel, resourceName, resourceType, quantity, availabilityNotes, isPrivate, targetOrganizationId } = req.body;
-    const type = req.user.role === 'business' ? 'supply' : 'demand';
+    const type = 'supply';
     const businessName = req.user.organizationName || req.user.displayName;
     const location = String(req.user.location || '').trim();
 
@@ -1769,6 +1794,136 @@ app.post('/api/listings', async (req, res, next) => {
     res.json({ success: true, listingId });
   } catch (err) {
     console.error('Create listing error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/listings/:id/respond', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+    if (req.user.role !== 'organization') {
+      return res.status(403).json({ success: false, error: 'Only nonprofit accounts can respond to listings.' });
+    }
+
+    const action = String(req.body?.action || '').trim().toLowerCase();
+    if (!['accept', 'decline'].includes(action)) {
+      return res.status(400).json({ success: false, error: 'action must be accept or decline' });
+    }
+
+    const { data: listingRow, error: listingError } = await supabase
+      .from('listings')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+    if (listingError || !listingRow) {
+      return res.status(404).json({ success: false, error: 'Listing not found' });
+    }
+
+    const listing = normalizeListingRow(listingRow);
+    if (listing.type !== 'supply' || Number(listing.active) !== 1 || isListingExpired(listing)) {
+      return res.status(409).json({ success: false, error: 'This business listing is no longer available.' });
+    }
+    if (!isListingVisibleToUser(listing, req.user)) {
+      return res.status(403).json({ success: false, error: 'You cannot respond to this listing.' });
+    }
+
+    const donationId = listingResponseDonationId(listing.id, req.user.id);
+    const { data: existingResponse } = await supabase
+      .from('donation_records')
+      .select('id, status')
+      .eq('id', donationId)
+      .maybeSingle();
+    if (existingResponse) {
+      return res.status(409).json({ success: false, error: `Your nonprofit already ${existingResponse.status} this listing.` });
+    }
+
+    const now = new Date().toISOString();
+    const listedQuantity = Number.parseFloat(String(listing.quantity || '').replace(/[^0-9.]/g, ''));
+    const quantity = Number.isFinite(listedQuantity) && listedQuantity > 0 ? listedQuantity : 1;
+    const productName = String(listing.resourceName || listing.category || 'Listed resource').trim();
+    const unit = String(listing.resourceType || 'listing').trim() || 'listing';
+    const status = action === 'accept' ? 'accepted' : 'declined';
+    const row = {
+      id: donationId,
+      donorOrgId: listing.ownerUserId,
+      donororgid: listing.ownerUserId,
+      donorLocationId: listing.location || '',
+      donorlocationid: listing.location || '',
+      recipientOrgId: req.user.id,
+      recipientorgid: req.user.id,
+      status,
+      gtin: '',
+      upc: '',
+      productName,
+      productname: productName,
+      productBrand: listing.businessName || '',
+      productbrand: listing.businessName || '',
+      productCategory: listing.category || 'other',
+      productcategory: listing.category || 'other',
+      quantity,
+      unit,
+      estimatedUnitValue: null,
+      estimatedunitvalue: null,
+      estimatedTotalValue: null,
+      estimatedtotalvalue: null,
+      currency: 'USD',
+      conditionNotes: listing.description || '',
+      conditionnotes: listing.description || '',
+      expiresAt: listing.offerClosesAt || '',
+      expiresat: listing.offerClosesAt || '',
+      pickupWindowStart: '',
+      pickupwindowstart: '',
+      pickupWindowEnd: '',
+      pickupwindowend: '',
+      acceptedAt: action === 'accept' ? now : '',
+      acceptedat: action === 'accept' ? now : '',
+      declinedAt: action === 'decline' ? now : '',
+      declinedat: action === 'decline' ? now : '',
+      createdByUserId: listing.ownerUserId,
+      createdbyuserid: listing.ownerUserId,
+      createdAt: now,
+      createdat: now,
+      updatedAt: now,
+      updatedat: now,
+    };
+
+    if (action === 'accept') {
+      const { data: reservedListings, error: reserveError } = await supabase
+        .from('listings')
+        .update({ active: 0, updatedAt: now, updatedat: now })
+        .eq('id', listing.id)
+        .eq('active', 1)
+        .select('id');
+      if (reserveError) {
+        return res.status(500).json({ success: false, error: explainSupabaseError(reserveError) });
+      }
+      if (!reservedListings?.length) {
+        return res.status(409).json({ success: false, error: 'Another nonprofit has already accepted this listing.' });
+      }
+    }
+
+    const { error: responseError } = await supabase.from('donation_records').insert([row]);
+    if (responseError) {
+      if (action === 'accept') {
+        await supabase
+          .from('listings')
+          .update({ active: 1, updatedAt: now, updatedat: now })
+          .eq('id', listing.id);
+      }
+      return res.status(500).json({ success: false, error: explainSupabaseError(responseError) });
+    }
+
+    await appendDonationEvent({
+      donationId,
+      eventType: status,
+      actorUserId: req.user.id,
+      actorRole: req.user.role,
+      payload: { sourceListingId: listing.id, businessName: listing.businessName },
+    });
+
+    res.json({ success: true, action, donationId });
+  } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -2012,22 +2167,11 @@ app.get('/api/donation-recipients', async (req, res) => {
       return res.status(403).json({ success: false, error: 'Only business users can select donation recipients.' });
     }
 
-    const listingRows = await getVisibleActiveListings(req.user);
-    const recipientIds = [...new Set(
-      listingRows
-        .filter((listing) => listing.type === 'demand')
-        .map((listing) => String(getFirstDefined(listing, ['ownerUserId', 'owneruserid']) || ''))
-        .filter(Boolean)
-    )];
-    if (recipientIds.length === 0) {
-      return res.json({ success: true, organizations: [] });
-    }
-
     const { data, error } = await supabase
       .from('users')
       .select('*')
       .eq('role', 'organization')
-      .in('id', recipientIds);
+      .limit(200);
     if (error) return res.status(500).json({ success: false, error: explainSupabaseError(error) });
 
     const organizations = (data || []).map((row) => {
@@ -2529,11 +2673,6 @@ app.post('/api/donations', async (req, res) => {
       if (recipientError || !recipient || String(recipient.role) !== 'organization') {
         return res.status(400).json({ success: false, error: 'recipientOrgId must reference an organization account' });
       }
-      const eligibleListings = await getVisibleActiveListings(req.user);
-      const isEligible = eligibleListings.some((listing) => listing.type === 'demand' && listing.ownerUserId === recipientOrgId);
-      if (!isEligible) {
-        return res.status(400).json({ success: false, error: 'The selected nonprofit must have an active resource request.' });
-      }
     }
 
     const id = `don_${crypto.randomUUID()}`;
@@ -2829,10 +2968,13 @@ app.patch('/api/donations/:id', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Estimated unit value must be zero or greater.' });
     }
     if (hasRecipientUpdate && recipientOrgId) {
-      const eligibleListings = await getVisibleActiveListings(req.user);
-      const isEligible = eligibleListings.some((listing) => listing.type === 'demand' && listing.ownerUserId === recipientOrgId);
-      if (!isEligible) {
-        return res.status(400).json({ success: false, error: 'The selected nonprofit must have an active resource request.' });
+      const { data: recipient, error: recipientError } = await supabase
+        .from('users')
+        .select('id, role')
+        .eq('id', recipientOrgId)
+        .single();
+      if (recipientError || !recipient || String(recipient.role) !== 'organization') {
+        return res.status(400).json({ success: false, error: 'recipientOrgId must reference an organization account' });
       }
     }
 

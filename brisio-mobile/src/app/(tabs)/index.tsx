@@ -317,6 +317,7 @@ export default function HomeScreen() {
                 {!!aiError && <ThemedText style={styles.errorText}>{aiError}</ThemedText>}
               </ThemedView>
 
+              {session.user.role === 'business' ? (
               <ThemedView type="backgroundElement" style={styles.panel}>
                 <View style={styles.sectionHeadingRow}>
                   <ThemedText type="smallBold">My listings</ThemedText>
@@ -418,6 +419,19 @@ export default function HomeScreen() {
                   ))
                 )}
               </ThemedView>
+              ) : (
+                <ThemedView type="backgroundElement" style={styles.panel}>
+                  <ThemedText type="smallBold">Find available resources</ThemedText>
+                  <ThemedText type="small" style={styles.helperText}>
+                    Browse offers from businesses and accept or decline the listings that match your nonprofit&apos;s needs.
+                  </ThemedText>
+                  <Link href="/explore" asChild>
+                    <Pressable style={styles.primaryBtn}>
+                      <ThemedText type="smallBold">Browse business listings</ThemedText>
+                    </Pressable>
+                  </Link>
+                </ThemedView>
+              )}
 
               <ThemedView type="backgroundElement" style={styles.panel}>
                 <ThemedText type="smallBold">Donation impact summary</ThemedText>

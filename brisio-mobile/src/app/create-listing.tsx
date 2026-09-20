@@ -79,6 +79,7 @@ export default function CreateListingScreen() {
       <ThemedText type="smallBold">
         Posting as {session.user.organizationName || session.user.displayName}
       </ThemedText>
+      <ThemedText type="small">Address: {session.user.location || 'No account address set'}</ThemedText>
 
       <ThemedText type="smallBold">Category</ThemedText>
       <TextInput
@@ -127,7 +128,7 @@ export default function CreateListingScreen() {
       ) : null}
 
       <ThemedText type="small" style={styles.helperText}>
-        Your account location will be attached to this listing.
+        Your business name and account address will be added automatically.
       </ThemedText>
 
       {!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}

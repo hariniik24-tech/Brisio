@@ -136,14 +136,14 @@ function ExploreContent() {
               ) : (
                 filtered.slice(0, 25).map((item) => (
                   <ThemedView key={item.id} type="backgroundElement" style={styles.listingCard}>
-                    <ThemedText type="smallBold">{item.businessName}</ThemedText>
+                    <ThemedText type="smallBold">Business: {item.businessName}</ThemedText>
                     <ThemedText type="small">
                       {item.type === 'supply' ? 'Available resource' : 'Resource request'} |{' '}
                       <ThemedText type="small" style={styles.categoryText}>{item.category}</ThemedText>
                     </ThemedText>
                     <ThemedText type="small">{item.description}</ThemedText>
                     {!!item.availabilityNotes && <ThemedText type="small">Timing: {item.availabilityNotes}</ThemedText>}
-                    <ThemedText type="small">{item.location || 'Location not set'}</ThemedText>
+                    <ThemedText type="small">Address: {item.location || 'Address not set'}</ThemedText>
                   </ThemedView>
                 ))
               )}

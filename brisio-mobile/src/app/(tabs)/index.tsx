@@ -386,12 +386,13 @@ export default function HomeScreen() {
                       ) : (
                         <>
                           <ThemedText type="smallBold" style={styles.categoryText}>{item.category}</ThemedText>
+                          <ThemedText type="small">Business: {item.businessName}</ThemedText>
                           <ThemedText type="small">
                             {item.type === 'supply' ? 'Available resource' : 'Resource request'}
                           </ThemedText>
                           <ThemedText type="small">{item.description}</ThemedText>
                           {!!item.availabilityNotes && <ThemedText type="small">Timing: {item.availabilityNotes}</ThemedText>}
-                          <ThemedText type="small">{item.location}</ThemedText>
+                          <ThemedText type="small">Address: {item.location || 'Address not set'}</ThemedText>
                           <View style={styles.listingActionRow}>
                             <Pressable
                               accessibilityRole="button"

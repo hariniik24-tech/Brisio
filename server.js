@@ -549,6 +549,25 @@ function normalizeSessionRow(row) {
   };
 }
 
+function normalizeListingRow(row) {
+  if (!row) return null;
+  return {
+    ...row,
+    businessName: getFirstDefined(row, ['businessName', 'businessname']) || '',
+    ownerUserId: getFirstDefined(row, ['ownerUserId', 'owneruserid']) || '',
+    deliverWithinHours: getFirstDefined(row, ['deliverWithinHours', 'deliverwithinhours']),
+    offerClosesAt: getFirstDefined(row, ['offerClosesAt', 'offerclosesat']) || '',
+    urgencyLevel: getFirstDefined(row, ['urgencyLevel', 'urgencylevel']) || 'normal',
+    resourceName: getFirstDefined(row, ['resourceName', 'resourcename']) || '',
+    resourceType: getFirstDefined(row, ['resourceType', 'resourcetype']) || '',
+    availabilityNotes: getFirstDefined(row, ['availabilityNotes', 'availabilitynotes']) || '',
+    isPrivate: Number(getFirstDefined(row, ['isPrivate', 'isprivate']) || 0),
+    targetOrganizationId: getFirstDefined(row, ['targetOrganizationId', 'targetorganizationid']) || '',
+    createdAt: getFirstDefined(row, ['createdAt', 'createdat']) || '',
+    updatedAt: getFirstDefined(row, ['updatedAt', 'updatedat']) || '',
+  };
+}
+
 async function getUserFromRequest(req) {
   const token = authTokenFromRequest(req);
   if (!token) return null;
@@ -655,12 +674,34 @@ async function getVisibleActiveListings(user) {
     blockedUserIds = new Set((blockedRows || []).map((row) => getFirstDefined(row, ['blockedUserId', 'blockeduserid'])).filter(Boolean));
   }
 
-  return listings
+  const normalizedListings = listings
+    .map(normalizeListingRow)
     .filter((listing) => {
-      const ownerUserId = String(listing.ownerUserId || listing.owneruserid || '');
-      return isListingVisibleToUser(listing, user) && !isListingExpired(listing) && (!ownerUserId || !blockedUserIds.has(ownerUserId));
-    })
-    .map((listing) => ({ ...listing, location: publicLocation(listing.location) }));
+      return isListingVisibleToUser(listing, user) && !isListingExpired(listing) && (!listing.ownerUserId || !blockedUserIds.has(listing.ownerUserId));
+    });
+
+  const ownerIds = [...new Set(normalizedListings.map((listing) => listing.ownerUserId).filter(Boolean))];
+  if (ownerIds.length === 0) return normalizedListings;
+
+  const { data: ownerRows, error: ownerError } = await supabase
+    .from('users')
+    .select('*')
+    .in('id', ownerIds);
+  if (ownerError) throw ownerError;
+
+  const ownersById = new Map((ownerRows || []).map((row) => {
+    const owner = normalizeUserRow(row);
+    return [owner.id, owner];
+  }));
+  return normalizedListings.map((listing) => {
+    const owner = ownersById.get(listing.ownerUserId);
+    if (!owner) return listing;
+    return {
+      ...listing,
+      businessName: owner.organizationName || owner.displayName || listing.businessName,
+      location: owner.location || listing.location,
+    };
+  });
 }
 
 async function getBlockedUsersForUser(userId) {
@@ -1622,7 +1663,7 @@ app.post('/api/listings', async (req, res, next) => {
     const { category, description, contact, urgent, deliverWithinHours, offerClosesAt, urgencyLevel, resourceName, resourceType, quantity, availabilityNotes, isPrivate, targetOrganizationId } = req.body;
     const type = req.user.role === 'business' ? 'supply' : 'demand';
     const businessName = req.user.organizationName || req.user.displayName;
-    const location = publicLocation(req.user.location);
+    const location = String(req.user.location || '').trim();
 
     if (!description) {
       return res.status(400).json({ success: false, error: 'description is required' });
@@ -1716,11 +1757,12 @@ app.get('/api/listings/:id', async (req, res, next) => {
       return res.status(404).json({ success: false, error: 'Listing not found' });
     }
 
-    if (!isListingVisibleToUser(listing, req.user)) {
+    const normalizedListing = normalizeListingRow(listing);
+    if (!isListingVisibleToUser(normalizedListing, req.user)) {
       return res.status(403).json({ success: false, error: 'Access denied' });
     }
 
-    res.json({ success: true, listing: { ...listing, location: publicLocation(listing.location) } });
+    res.json({ success: true, listing: normalizedListing });
   } catch (err) {
     console.error('Get listing error:', err);
     res.status(500).json({ success: false, error: err.message });

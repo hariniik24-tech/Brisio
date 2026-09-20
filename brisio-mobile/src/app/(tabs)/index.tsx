@@ -42,7 +42,7 @@ export default function HomeScreen() {
 
   const [deletingListingId, setDeletingListingId] = useState('');
   const [editingListingId, setEditingListingId] = useState('');
-  const [editForm, setEditForm] = useState({ category: '', description: '', contact: '' });
+  const [editForm, setEditForm] = useState({ category: '', description: '', contact: '', availabilityNotes: '' });
   const [listingUpdating, setListingUpdating] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
@@ -161,6 +161,7 @@ export default function HomeScreen() {
       category: listing.category,
       description: listing.description,
       contact: listing.contact,
+      availabilityNotes: listing.availabilityNotes || '',
     });
     setFormError('');
     setFormSuccess('');
@@ -181,6 +182,7 @@ export default function HomeScreen() {
         category: editForm.category.trim().toLowerCase(),
         description: editForm.description.trim(),
         contact: editForm.contact.trim(),
+        availabilityNotes: editForm.availabilityNotes.trim(),
       });
       setEditingListingId('');
       setFormSuccess('Listing updated.');
@@ -362,6 +364,16 @@ export default function HomeScreen() {
                             value={editForm.contact}
                             onChangeText={(value) => setEditForm((previous) => ({ ...previous, contact: value }))}
                           />
+                          {item.type === 'supply' ? (
+                            <TextInput
+                              accessibilityLabel="Delivery or pickup timing"
+                              style={styles.input}
+                              placeholder="Today at 4 PM, in 30 minutes, tomorrow morning..."
+                              placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+                              value={editForm.availabilityNotes}
+                              onChangeText={(value) => setEditForm((previous) => ({ ...previous, availabilityNotes: value }))}
+                            />
+                          ) : null}
                           <View style={styles.modeRow}>
                             <Pressable style={[styles.primaryBtn, listingUpdating && styles.disabledBtn]} onPress={saveListingEdits} disabled={listingUpdating}>
                               <ThemedText type="smallBold">{listingUpdating ? 'Saving...' : 'Save changes'}</ThemedText>
@@ -378,6 +390,7 @@ export default function HomeScreen() {
                             {item.type === 'supply' ? 'Available resource' : 'Resource request'}
                           </ThemedText>
                           <ThemedText type="small">{item.description}</ThemedText>
+                          {!!item.availabilityNotes && <ThemedText type="small">Timing: {item.availabilityNotes}</ThemedText>}
                           <ThemedText type="small">{item.location}</ThemedText>
                           <View style={styles.listingActionRow}>
                             <Pressable

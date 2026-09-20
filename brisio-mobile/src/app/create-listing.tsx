@@ -21,7 +21,7 @@ export default function CreateListingScreen() {
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [contact, setContact] = useState('');
-  const [deliverWithinHours, setDeliverWithinHours] = useState('');
+  const [deliveryTiming, setDeliveryTiming] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -41,8 +41,8 @@ export default function CreateListingScreen() {
         description: description.trim(),
         contact: contact.trim(),
         location: session.user.location,
-        ...(session.user.role === 'business' && deliverWithinHours.trim()
-          ? { deliverWithinHours: deliverWithinHours.trim() }
+        ...(session.user.role === 'business' && deliveryTiming.trim()
+          ? { availabilityNotes: deliveryTiming.trim() }
           : {}),
       });
       router.replace('/');
@@ -113,13 +113,12 @@ export default function CreateListingScreen() {
         <>
           <ThemedText type="smallBold">Delivery timing</ThemedText>
           <TextInput
-            accessibilityLabel="Delivery time in hours"
+            accessibilityLabel="Delivery or pickup timing"
             style={styles.input}
-            placeholder="Deliver within hours (optional)"
+            placeholder="Today at 4 PM, in 30 minutes, tomorrow morning..."
             placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-            keyboardType="numeric"
-            value={deliverWithinHours}
-            onChangeText={setDeliverWithinHours}
+            value={deliveryTiming}
+            onChangeText={setDeliveryTiming}
           />
         </>
       ) : null}

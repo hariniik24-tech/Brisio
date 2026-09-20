@@ -962,7 +962,10 @@
         resourceName: document.getElementById('listingResourceName').value.trim(),
         resourceType: document.getElementById('listingResourceType').value.trim(),
         quantity: document.getElementById('listingQuantity').value.trim(),
-        availabilityNotes: document.getElementById('listingAvailabilityNotes').value.trim()
+        availabilityNotes: [
+          document.getElementById('listingDelivery').value.trim(),
+          document.getElementById('listingAvailabilityNotes').value.trim()
+        ].filter(Boolean).join(' | ')
       };
 
       if (!payload.location) {
@@ -970,7 +973,6 @@
       }
 
       if (state.user.role === 'business') {
-        payload.deliverWithinHours = document.getElementById('listingDelivery').value;
         payload.offerClosesAt = document.getElementById('listingClose').value;
         const target = document.getElementById('listingPrivateTarget').value;
         if (target) {
@@ -1002,8 +1004,10 @@
         resourceName: document.getElementById('privateResourceName').value.trim(),
         resourceType: document.getElementById('privateResourceType').value.trim(),
         quantity: document.getElementById('privateQuantity').value.trim(),
-        availabilityNotes: document.getElementById('privateAvailabilityNotes').value.trim(),
-        deliverWithinHours: document.getElementById('privateDelivery').value,
+        availabilityNotes: [
+          document.getElementById('privateDelivery').value.trim(),
+          document.getElementById('privateAvailabilityNotes').value.trim()
+        ].filter(Boolean).join(' | '),
         offerClosesAt: document.getElementById('privateClose').value,
         targetOrganizationId: document.getElementById('privateTarget').value
       };
@@ -1252,7 +1256,7 @@
         ['Type of resource', item.resourceType || 'Not specified'],
         ['Quantity / capacity', item.quantity || 'Not specified'],
         ['Location', item.location || 'Local'],
-        ['Delivery ETA', item.deliverWithinHours ? `${item.deliverWithinHours} hours` : 'Not specified'],
+        ['Delivery or pickup timing', item.availabilityNotes || (item.deliverWithinHours ? `${item.deliverWithinHours} hours` : 'Not specified')],
         ['Expiration', item.offerClosesAt ? new Date(item.offerClosesAt).toLocaleString() : 'Not specified'],
         ['Contact', item.contact || 'Not specified'],
         ['Availability notes', item.availabilityNotes || 'Not specified']
@@ -1487,7 +1491,7 @@
             <div class="field"><label>Resource name</label><input id="listingResourceName" placeholder="Boxed lunches / projector set / meeting room" /></div>
             <div class="field"><label>Type of resource</label><input id="listingResourceType" placeholder="Vegetarian meals / audio equipment / classroom space" /></div>
             <div class="field"><label>Quantity or capacity</label><input id="listingQuantity" placeholder="30 meals / 2 projectors / room for 20" /></div>
-            <div class="field"><label>Delivery ETA (hours)</label><input id="listingDelivery" type="number" min="0" placeholder="4" /></div>
+            <div class="field"><label>Delivery or pickup timing</label><input id="listingDelivery" placeholder="Today at 4 PM / in 30 minutes / tomorrow morning" /></div>
             <div class="field"><label>Offer closes at (expiry)</label><input id="listingClose" type="datetime-local" /></div>
             <div class="field">
               <label>Private offer target (optional)</label>
@@ -1502,7 +1506,7 @@
             <div class="field"><label>State</label><input id="listingState" placeholder="TX" /></div>
             <div class="field"><label>ZIP code</label><input id="listingZip" placeholder="78701" /></div>
           </div>
-          <div class="field"><label>Availability notes</label><input id="listingAvailabilityNotes" placeholder="Pickup after 2 PM, elevator access, allergen notes, setup details" /></div>
+            <div class="field"><label>Additional notes</label><input id="listingAvailabilityNotes" placeholder="Elevator access, allergen notes, setup details" /></div>
           <div class="field"><label>Description</label><textarea id="listingDescription"></textarea></div>
           <button class="btn" onclick="submitListing()">Post listing</button>
         </div>
@@ -1517,7 +1521,7 @@
             <div class="field"><label>Resource name</label><input id="privateResourceName" placeholder="Shelf-stable food boxes / folding tables" /></div>
             <div class="field"><label>Type of resource</label><input id="privateResourceType" placeholder="Pantry staples / event furniture / workshop room" /></div>
             <div class="field"><label>Quantity or capacity</label><input id="privateQuantity" placeholder="20 boxes / 8 tables / room for 40" /></div>
-            <div class="field"><label>Deliver in hours</label><input id="privateDelivery" type="number" min="0" /></div>
+            <div class="field"><label>Delivery or pickup timing</label><input id="privateDelivery" placeholder="Today at 4 PM / in 30 minutes" /></div>
             <div class="field"><label>Offer closes at</label><input id="privateClose" type="datetime-local" /></div>
             <div class="field"><label>Contact</label><input id="privateContact" /></div>
             <div class="field"><label>Street address</label><input id="privateStreet" placeholder="123 Main St" /></div>
@@ -1525,7 +1529,7 @@
             <div class="field"><label>State</label><input id="privateState" placeholder="TX" /></div>
             <div class="field"><label>ZIP code</label><input id="privateZip" placeholder="78701" /></div>
           </div>
-          <div class="field"><label>Availability notes</label><input id="privateAvailabilityNotes" placeholder="Dock pickup, loading help available, room access instructions" /></div>
+          <div class="field"><label>Additional notes</label><input id="privateAvailabilityNotes" placeholder="Dock access, loading help, room instructions" /></div>
           <div class="field"><label>Description</label><textarea id="privateDescription"></textarea></div>
           <button class="btn" onclick="submitPrivateOffer()">Send private offer</button>
         </div>

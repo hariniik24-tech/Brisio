@@ -18,6 +18,7 @@ export type ApiListing = {
   description: string;
   contact: string;
   location: string;
+  availabilityNotes?: string;
   active: number;
   ownerUserId: string;
   createdAt: string;
@@ -283,6 +284,7 @@ export async function createListing(
     location: string;
     urgencyLevel?: 'low' | 'medium' | 'high' | 'critical';
     deliverWithinHours?: string;
+    availabilityNotes?: string;
   }
 ) {
   return apiRequest<{ success: true; listingId: string }>('/api/listings', {
@@ -299,6 +301,7 @@ export async function updateListing(
     category: string;
     description: string;
     contact: string;
+    availabilityNotes?: string;
   }
 ) {
   return apiRequest<{ success: true }>(`/api/listings/${encodeURIComponent(listingId)}`, {

@@ -919,7 +919,6 @@ app.post('/api/listings', requireAuth, (req, res) => {
   }
 
   const type = userRole === 'business' ? 'supply' : 'demand';
-  const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const detectedCategory = detectCategory(`${req.user.organizationName} ${description}`);
   const finalCategory = category === 'other' ? detectedCategory : category;
@@ -957,6 +956,26 @@ app.post('/api/listings', requireAuth, (req, res) => {
   }
 
   const normalizedDescription = String(description).trim();
+  const normalizedContact = String(contact || '').trim();
+  const normalizedAvailabilityNotes = String(availabilityNotes || '').trim();
+  const duplicate = db.prepare(`
+    SELECT id FROM listings
+    WHERE ownerUserId = ? AND category = ? AND description = ? AND contact = ?
+      AND availabilityNotes = ? AND createdAt >= ?
+    ORDER BY createdAt DESC LIMIT 1
+  `).get(
+    req.user.id,
+    finalCategory,
+    normalizedDescription,
+    normalizedContact,
+    normalizedAvailabilityNotes,
+    new Date(Date.now() - 60 * 1000).toISOString()
+  );
+  if (duplicate) {
+    return res.json({ success: true, listingId: duplicate.id, duplicatePrevented: true });
+  }
+
+  const id = crypto.randomUUID();
   const businessName = req.user.organizationName || req.user.displayName;
   const urgent = userRole === 'organization'
     ? Number(urgency === 'high' || urgency === 'critical')
@@ -975,7 +994,7 @@ app.post('/api/listings', requireAuth, (req, res) => {
     finalCategory,
     businessName,
     normalizedDescription,
-    String(contact || '').trim(),
+    normalizedContact,
     String(location || req.user.location || '').trim(),
     urgent,
     now,
@@ -989,7 +1008,7 @@ app.post('/api/listings', requireAuth, (req, res) => {
     String(resourceName || '').trim(),
     String(resourceType || '').trim(),
     String(quantity || '').trim(),
-    String(availabilityNotes || '').trim()
+    normalizedAvailabilityNotes
   );
 
   const listing = db.prepare('SELECT * FROM listings WHERE id = ?').get(id);

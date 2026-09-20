@@ -1628,9 +1628,30 @@ app.post('/api/listings', async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'description is required' });
     }
 
-    const listingId = crypto.randomUUID();
     const now = new Date().toISOString();
-    const detectedCategory = category || detectCategory(description);
+    const normalizedDescription = String(description).trim();
+    const detectedCategory = String(category || detectCategory(normalizedDescription)).trim();
+    const normalizedContact = String(contact || '').trim();
+    const normalizedAvailabilityNotes = String(availabilityNotes || '').trim();
+    const duplicateCutoff = new Date(Date.now() - 60 * 1000).toISOString();
+    const { data: recentListings } = await supabase
+      .from('listings')
+      .select('*')
+      .eq('ownerUserId', req.user.id)
+      .gte('createdAt', duplicateCutoff)
+      .order('createdAt', { ascending: false })
+      .limit(10);
+    const duplicate = (recentListings || []).find((listing) => (
+      String(getFirstDefined(listing, ['category']) || '').trim() === detectedCategory
+      && String(getFirstDefined(listing, ['description']) || '').trim() === normalizedDescription
+      && String(getFirstDefined(listing, ['contact']) || '').trim() === normalizedContact
+      && String(getFirstDefined(listing, ['availabilityNotes', 'availabilitynotes']) || '').trim() === normalizedAvailabilityNotes
+    ));
+    if (duplicate) {
+      return res.json({ success: true, listingId: duplicate.id, duplicatePrevented: true });
+    }
+
+    const listingId = crypto.randomUUID();
 
     const { error } = await supabase.from('listings').insert([{
       id: listingId,
@@ -1638,8 +1659,8 @@ app.post('/api/listings', async (req, res, next) => {
       category: detectedCategory,
       businessName,
       businessname: businessName,
-      description,
-      contact: contact || '',
+      description: normalizedDescription,
+      contact: normalizedContact,
       location: location || '',
       urgent: urgent ? 1 : 0,
       active: 1,
@@ -1656,8 +1677,8 @@ app.post('/api/listings', async (req, res, next) => {
       resourceType: resourceType || '',
       resourcetype: resourceType || '',
       quantity: quantity || '',
-      availabilityNotes: availabilityNotes || '',
-      availabilitynotes: availabilityNotes || '',
+      availabilityNotes: normalizedAvailabilityNotes,
+      availabilitynotes: normalizedAvailabilityNotes,
       isPrivate: isPrivate ? 1 : 0,
       isprivate: isPrivate ? 1 : 0,
       targetOrganizationId: targetOrganizationId || '',

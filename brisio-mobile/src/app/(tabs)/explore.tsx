@@ -142,6 +142,7 @@ function ExploreContent() {
                       <ThemedText type="small" style={styles.categoryText}>{item.category}</ThemedText>
                     </ThemedText>
                     <ThemedText type="small">{item.description}</ThemedText>
+                    {!!item.availabilityNotes && <ThemedText type="small">Timing: {item.availabilityNotes}</ThemedText>}
                     <ThemedText type="small">{item.location || 'Location not set'}</ThemedText>
                   </ThemedView>
                 ))

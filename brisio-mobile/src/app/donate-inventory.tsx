@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
 import { Href, useFocusEffect, useRouter } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -7,6 +7,7 @@ import { StackScreenShell } from '@/components/stack-screen-shell';
 import { ThemedText } from '@/components/themed-text';
 import {
   exportDonationRecordsCsv,
+  deleteDonationRecord,
   generateDonationHandoffToken,
   getDonationImpactSummary,
   getDonations,
@@ -51,6 +52,7 @@ export default function DonateInventoryScreen() {
   const [handoffExpiresAtById, setHandoffExpiresAtById] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<DonationEdit | null>(null);
   const [editBusy, setEditBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState('');
   const [summary, setSummary] = useState({
     itemsDonated: 0,
     estimatedInventoryValue: 0,
@@ -173,6 +175,31 @@ export default function DonateInventoryScreen() {
     }
   }
 
+  function confirmDelete(record: ApiDonation) {
+    if (!session.token || record.status !== 'posted' || deletingId) return;
+    Alert.alert('Delete donation record?', 'This pending record will be permanently removed.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setDeletingId(record.id);
+          setMessage('');
+          try {
+            await deleteDonationRecord(session.token!, record.id);
+            if (editing?.id === record.id) setEditing(null);
+            await loadRecords();
+            setMessage('Donation record deleted.');
+          } catch (err) {
+            setMessage(err instanceof Error ? err.message : 'Could not delete the donation record.');
+          } finally {
+            setDeletingId('');
+          }
+        },
+      },
+    ]);
+  }
+
   if (!session.isAuthenticated || !session.user) {
     return (
       <StackScreenShell>
@@ -248,7 +275,8 @@ export default function DonateInventoryScreen() {
             <ThemedText type="small">Recipient: {record.recipientName || 'Assigned nonprofit'}</ThemedText>
             <ThemedText type="small">Quantity: {record.quantity} {record.unit}</ThemedText>
             <ThemedText type="small">Created: {formatDate(record.createdAt)}</ThemedText>
-            {typeof record.estimatedTotalValue === 'number' ? <ThemedText type="small">Recorded value: {formatCurrency(record.estimatedTotalValue)}</ThemedText> : null}
+            {typeof record.estimatedUnitValue === 'number' ? <ThemedText type="small">Estimated value per unit: {formatCurrency(record.estimatedUnitValue)}</ThemedText> : null}
+            {typeof record.estimatedTotalValue === 'number' ? <ThemedText type="small">Estimated total: {formatCurrency(record.estimatedTotalValue)}</ThemedText> : null}
 
             {editing?.id === record.id ? (
               <View style={styles.editForm}>
@@ -269,7 +297,10 @@ export default function DonateInventoryScreen() {
                   </View>
                 </View>
                 <ThemedText type="smallBold">Estimated value per unit</ThemedText>
-                <TextInput style={styles.input} value={editing.estimatedUnitValue} onChangeText={(estimatedUnitValue) => setEditing({ ...editing, estimatedUnitValue })} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
+                <View style={styles.currencyInputRow}>
+                  <ThemedText type="smallBold" style={styles.currencyPrefix}>$</ThemedText>
+                  <TextInput style={styles.currencyInput} value={editing.estimatedUnitValue} onChangeText={(estimatedUnitValue) => setEditing({ ...editing, estimatedUnitValue })} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
+                </View>
                 <ThemedText type="smallBold">Condition notes</ThemedText>
                 <TextInput style={[styles.input, styles.textArea]} value={editing.conditionNotes} onChangeText={(conditionNotes) => setEditing({ ...editing, conditionNotes })} multiline placeholder="Sealed case, best-by date" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
                 <View style={styles.actionRow}>
@@ -282,9 +313,14 @@ export default function DonateInventoryScreen() {
                 </View>
               </View>
             ) : record.status === 'posted' ? (
-              <Pressable style={styles.secondaryBtn} onPress={() => startEditing(record)}>
-                <ThemedText type="smallBold">Edit record</ThemedText>
-              </Pressable>
+              <View style={styles.actionRow}>
+                <Pressable style={[styles.secondaryBtn, styles.actionBtn]} onPress={() => startEditing(record)} disabled={Boolean(deletingId)}>
+                  <ThemedText type="smallBold">Edit record</ThemedText>
+                </Pressable>
+                <Pressable style={[styles.deleteBtn, styles.actionBtn, deletingId === record.id && styles.disabledBtn]} onPress={() => confirmDelete(record)} disabled={Boolean(deletingId)}>
+                  {deletingId === record.id ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold" style={styles.deleteText}>Delete</ThemedText>}
+                </Pressable>
+              </View>
             ) : null}
 
             {record.status === 'accepted' ? (
@@ -336,6 +372,11 @@ const styles = StyleSheet.create({
   editForm: { gap: Spacing.one, paddingTop: Spacing.two },
   editField: { flex: 1, gap: Spacing.one },
   input: { borderWidth: 1, borderColor: '#C3CDDB', borderRadius: Spacing.three, paddingHorizontal: Spacing.three, paddingVertical: 12, fontSize: 14, backgroundColor: '#FFFFFF', color: '#1C2735' },
+  currencyInputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#C3CDDB', borderRadius: Spacing.three, backgroundColor: '#FFFFFF' },
+  currencyPrefix: { paddingLeft: Spacing.three, color: '#445164' },
+  currencyInput: { flex: 1, paddingHorizontal: Spacing.two, paddingVertical: 12, fontSize: 14, color: '#1C2735' },
+  deleteBtn: { alignItems: 'center', borderRadius: Spacing.three, paddingVertical: Spacing.three, borderWidth: 1, borderColor: '#C86B65', backgroundColor: '#FFF5F4' },
+  deleteText: { color: '#9C332D' },
   textArea: { minHeight: 84, textAlignVertical: 'top' },
   qrBox: { alignItems: 'center', gap: Spacing.one, padding: Spacing.two, borderRadius: Spacing.three, backgroundColor: '#F3F8FF' },
   secondaryBtn: { alignItems: 'center', borderRadius: Spacing.three, paddingVertical: Spacing.three, paddingHorizontal: Spacing.two, borderWidth: 1, borderColor: '#CDD5E1', backgroundColor: '#F7F9FC' },

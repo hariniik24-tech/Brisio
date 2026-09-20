@@ -298,7 +298,10 @@ export default function CreateDonationRecordScreen() {
       <ThemedText type="smallBold">Quantity type</ThemedText>
       <TextInput style={styles.input} value={unit} onChangeText={setUnit} placeholder="Cases, boxes, pounds, or items" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
       <ThemedText type="smallBold">Estimated value per unit (optional)</ThemedText>
-      <TextInput style={styles.input} value={estimatedUnitValue} onChangeText={setEstimatedUnitValue} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
+      <View style={styles.currencyInputRow}>
+        <ThemedText type="smallBold" style={styles.currencyPrefix}>$</ThemedText>
+        <TextInput style={styles.currencyInput} value={estimatedUnitValue} onChangeText={setEstimatedUnitValue} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
+      </View>
       {Number(quantity) > 0 && Number(estimatedUnitValue) >= 0 && estimatedUnitValue.trim() ? (
         <ThemedText type="small">Recorded total: {formatCurrency(Number(quantity) * Number(estimatedUnitValue))}</ThemedText>
       ) : null}
@@ -346,6 +349,9 @@ const styles = StyleSheet.create({
   backBtn: { alignSelf: 'flex-start' },
   helperText: { color: '#5B6778', lineHeight: 18 },
   input: { borderWidth: 1, borderColor: '#C3CDDB', borderRadius: Spacing.three, paddingHorizontal: Spacing.three, paddingVertical: 12, fontSize: 14, backgroundColor: '#FFFFFF', color: '#1C2735' },
+  currencyInputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#C3CDDB', borderRadius: Spacing.three, backgroundColor: '#FFFFFF' },
+  currencyPrefix: { paddingLeft: Spacing.three, color: '#445164' },
+  currencyInput: { flex: 1, paddingHorizontal: Spacing.two, paddingVertical: 12, fontSize: 14, color: '#1C2735' },
   textArea: { minHeight: 90, textAlignVertical: 'top' },
   card: { borderWidth: 1, borderColor: '#D6DFEA', borderRadius: Spacing.three, padding: Spacing.three, gap: 4, backgroundColor: '#FAFCFF' },
   scannerCard: { borderWidth: 1, borderColor: '#C9D8EC', borderRadius: Spacing.three, overflow: 'hidden', gap: Spacing.two, paddingBottom: Spacing.two, backgroundColor: '#F3F8FF' },

@@ -443,7 +443,34 @@ async function getDonationById(donationId) {
     .eq('id', donationId)
     .single();
   if (error || !data) return null;
-  return data;
+  return normalizeDonationRow(data);
+}
+
+function normalizeDonationRow(row) {
+  if (!row) return null;
+  const estimatedUnitValue = getFirstDefined(row, ['estimatedUnitValue', 'estimatedunitvalue']);
+  const estimatedTotalValue = getFirstDefined(row, ['estimatedTotalValue', 'estimatedtotalvalue']);
+  return {
+    ...row,
+    donorOrgId: getFirstDefined(row, ['donorOrgId', 'donororgid']) || '',
+    donorLocationId: getFirstDefined(row, ['donorLocationId', 'donorlocationid']) || '',
+    recipientOrgId: getFirstDefined(row, ['recipientOrgId', 'recipientorgid']) || '',
+    productName: getFirstDefined(row, ['productName', 'productname']) || '',
+    productBrand: getFirstDefined(row, ['productBrand', 'productbrand']) || '',
+    productCategory: getFirstDefined(row, ['productCategory', 'productcategory']) || 'food',
+    estimatedUnitValue: estimatedUnitValue === null || estimatedUnitValue === undefined ? null : Number(estimatedUnitValue),
+    estimatedTotalValue: estimatedTotalValue === null || estimatedTotalValue === undefined ? null : Number(estimatedTotalValue),
+    conditionNotes: getFirstDefined(row, ['conditionNotes', 'conditionnotes']) || '',
+    expiresAt: getFirstDefined(row, ['expiresAt', 'expiresat']) || '',
+    pickupWindowStart: getFirstDefined(row, ['pickupWindowStart', 'pickupwindowstart']) || '',
+    pickupWindowEnd: getFirstDefined(row, ['pickupWindowEnd', 'pickupwindowend']) || '',
+    acceptedAt: getFirstDefined(row, ['acceptedAt', 'acceptedat']) || '',
+    declinedAt: getFirstDefined(row, ['declinedAt', 'declinedat']) || '',
+    receivedAt: getFirstDefined(row, ['receivedAt', 'receivedat']) || '',
+    createdByUserId: getFirstDefined(row, ['createdByUserId', 'createdbyuserid']) || '',
+    createdAt: getFirstDefined(row, ['createdAt', 'createdat']) || '',
+    updatedAt: getFirstDefined(row, ['updatedAt', 'updatedat']) || '',
+  };
 }
 
 async function buildDonationAcknowledgment(donation) {
@@ -2589,7 +2616,7 @@ app.get('/api/donations', async (req, res) => {
       return res.status(500).json({ success: false, error: explainSupabaseError(error) });
     }
 
-    const donations = data || [];
+    const donations = (data || []).map(normalizeDonationRow);
     const recipientIds = [...new Set(
       donations
         .map((donation) => String(getFirstDefined(donation, ['recipientOrgId', 'recipientorgid']) || ''))
@@ -2827,6 +2854,49 @@ app.patch('/api/donations/:id', async (req, res) => {
     });
 
     res.json({ success: true, donation: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/donations/:id', async (req, res) => {
+  try {
+    await requireAuth(req, res, () => {});
+    if (!req.user) return;
+    if (req.user.role !== 'business') {
+      return res.status(403).json({ success: false, error: 'Only business users can delete donation records.' });
+    }
+
+    const donation = await getDonationById(req.params.id);
+    if (!donation) {
+      return res.status(404).json({ success: false, error: 'Donation not found' });
+    }
+    const createdByUserId = String(getFirstDefined(donation, ['createdByUserId', 'createdbyuserid']));
+    if (createdByUserId !== req.user.id) {
+      return res.status(403).json({ success: false, error: 'You can delete only donation records you created.' });
+    }
+    if (String(getFirstDefined(donation, ['status'])) !== 'posted') {
+      return res.status(409).json({ success: false, error: 'Only records awaiting review can be deleted.' });
+    }
+
+    const { error: eventsError } = await supabase
+      .from('donation_events')
+      .delete()
+      .eq('donationId', req.params.id);
+    if (eventsError) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(eventsError) });
+    }
+
+    const { error } = await supabase
+      .from('donation_records')
+      .delete()
+      .eq('id', req.params.id)
+      .eq('createdByUserId', req.user.id);
+    if (error) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(error) });
+    }
+
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -393,6 +393,13 @@ export async function updateDonationRecord(
   });
 }
 
+export async function deleteDonationRecord(token: string, donationId: string) {
+  return apiRequest<{ success: true }>(`/api/donations/${encodeURIComponent(donationId)}`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
 export async function acceptDonation(token: string, donationId: string, note?: string) {
   return apiRequest<{ success: true; status: 'accepted' }>(`/api/donations/${encodeURIComponent(donationId)}/accept`, {
     method: 'POST',

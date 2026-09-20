@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions, type BarcodeType } from 'expo-camera';
@@ -21,6 +21,19 @@ const IOS_RETAIL_BARCODE_TYPES: BarcodeType[] = ['ean13', 'ean8', 'upc_e'];
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+}
+
+function parseDecimalInput(value: string) {
+  const normalized = value.trim().replace(',', '.').replace(/[^0-9.-]/g, '');
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeDecimalInput(value: string) {
+  const normalized = value.replace(',', '.').replace(/[^0-9.]/g, '');
+  const [whole = '', ...decimalParts] = normalized.split('.');
+  return decimalParts.length ? `${whole}.${decimalParts.join('')}` : whole;
 }
 
 export default function CreateDonationRecordScreen() {
@@ -46,10 +59,11 @@ export default function CreateDonationRecordScreen() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
-  const canSubmit = useMemo(() => {
-    const parsedQuantity = Number(quantity);
-    return !!product && Number.isFinite(parsedQuantity) && parsedQuantity > 0;
-  }, [product, quantity]);
+  const parsedQuantity = parseDecimalInput(quantity);
+  const parsedUnitValue = parseDecimalInput(estimatedUnitValue);
+  const estimatedTotal = parsedQuantity !== null && parsedQuantity > 0 && parsedUnitValue !== null && parsedUnitValue >= 0
+    ? parsedQuantity * parsedUnitValue
+    : null;
 
   useEffect(() => {
     if (!session.token || session.user?.role !== 'business') {
@@ -161,10 +175,17 @@ export default function CreateDonationRecordScreen() {
   }
 
   async function submitRecord() {
-    if (!session.token || !session.user || !product || submittingRef.current) return;
-    const parsedQuantity = Number(quantity);
-    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+    if (!session.token || !session.user || submittingRef.current) return;
+    if (!product || !product.name.trim()) {
+      setMessage('Identify the product and enter its product name before saving.');
+      return;
+    }
+    if (parsedQuantity === null || parsedQuantity <= 0) {
       setMessage('Enter a quantity greater than zero.');
+      return;
+    }
+    if (estimatedUnitValue.trim() && (parsedUnitValue === null || parsedUnitValue < 0)) {
+      setMessage('Enter a valid estimated value per unit, such as 1.25.');
       return;
     }
 
@@ -172,7 +193,6 @@ export default function CreateDonationRecordScreen() {
     setBusy(true);
     setMessage('');
     try {
-      const parsedUnitValue = Number(estimatedUnitValue);
       const response = await createDonationRecord(session.token, {
         donorLocationId: session.user.id,
         recipientOrgId,
@@ -180,7 +200,7 @@ export default function CreateDonationRecordScreen() {
         quantity: parsedQuantity,
         unit: unit.trim() || 'units',
         conditionNotes: conditionNotes.trim(),
-        estimatedUnitValue: Number.isFinite(parsedUnitValue) && parsedUnitValue >= 0 ? parsedUnitValue : undefined,
+        estimatedUnitValue: parsedUnitValue !== null && parsedUnitValue >= 0 ? parsedUnitValue : undefined,
       });
       router.replace({ pathname: '/donation-success', params: { donationId: response.donation.id } });
     } catch (err) {
@@ -294,16 +314,16 @@ export default function CreateDonationRecordScreen() {
       ) : null}
 
       <ThemedText type="smallBold">Quantity</ThemedText>
-      <TextInput style={styles.input} value={quantity} onChangeText={setQuantity} keyboardType="decimal-pad" placeholder="12" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
+      <TextInput style={styles.input} value={quantity} onChangeText={(value) => setQuantity(normalizeDecimalInput(value))} keyboardType="decimal-pad" placeholder="12" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
       <ThemedText type="smallBold">Quantity type</ThemedText>
       <TextInput style={styles.input} value={unit} onChangeText={setUnit} placeholder="Cases, boxes, pounds, or items" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
       <ThemedText type="smallBold">Estimated value per unit (optional)</ThemedText>
       <View style={styles.currencyInputRow}>
         <ThemedText type="smallBold" style={styles.currencyPrefix}>$</ThemedText>
-        <TextInput style={styles.currencyInput} value={estimatedUnitValue} onChangeText={setEstimatedUnitValue} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
+        <TextInput style={styles.currencyInput} value={estimatedUnitValue} onChangeText={(value) => setEstimatedUnitValue(normalizeDecimalInput(value))} keyboardType="decimal-pad" placeholder="0.00" placeholderTextColor={INPUT_PLACEHOLDER_COLOR} />
       </View>
-      {Number(quantity) > 0 && Number(estimatedUnitValue) >= 0 && estimatedUnitValue.trim() ? (
-        <ThemedText type="small">Recorded total: {formatCurrency(Number(quantity) * Number(estimatedUnitValue))}</ThemedText>
+      {estimatedTotal !== null ? (
+        <ThemedText type="smallBold" style={styles.totalValue}>Estimated total: {formatCurrency(estimatedTotal)}</ThemedText>
       ) : null}
 
       <ThemedText type="smallBold">Recipient nonprofit</ThemedText>
@@ -338,7 +358,7 @@ export default function CreateDonationRecordScreen() {
         multiline
       />
       {!!message ? <ThemedText style={styles.message}>{message}</ThemedText> : null}
-      <Pressable style={[styles.primaryBtn, (!canSubmit || busy) && styles.disabledBtn]} onPress={submitRecord} disabled={!canSubmit || busy}>
+      <Pressable style={[styles.primaryBtn, busy && styles.disabledBtn]} onPress={submitRecord} disabled={busy}>
         {busy ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">{recipientOrgId ? 'Create record' : 'Save unassigned record'}</ThemedText>}
       </Pressable>
     </StackScreenShell>
@@ -352,6 +372,7 @@ const styles = StyleSheet.create({
   currencyInputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#C3CDDB', borderRadius: Spacing.three, backgroundColor: '#FFFFFF' },
   currencyPrefix: { paddingLeft: Spacing.three, color: '#445164' },
   currencyInput: { flex: 1, paddingHorizontal: Spacing.two, paddingVertical: 12, fontSize: 14, color: '#1C2735' },
+  totalValue: { color: '#244F3D' },
   textArea: { minHeight: 90, textAlignVertical: 'top' },
   card: { borderWidth: 1, borderColor: '#D6DFEA', borderRadius: Spacing.three, padding: Spacing.three, gap: 4, backgroundColor: '#FAFCFF' },
   scannerCard: { borderWidth: 1, borderColor: '#C9D8EC', borderRadius: Spacing.three, overflow: 'hidden', gap: Spacing.two, paddingBottom: Spacing.two, backgroundColor: '#F3F8FF' },

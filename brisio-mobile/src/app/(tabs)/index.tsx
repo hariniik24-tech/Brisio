@@ -275,18 +275,18 @@ export default function HomeScreen() {
             </ThemedView>
           ) : (
             <>
-              <ThemedView type="backgroundElement" style={styles.panel}>
+              <ThemedView type="backgroundElement" style={[styles.panel, styles.accountActionPanel]}>
                 {session.user.role === 'business' ? (
                   <Link href="/donate-inventory" asChild>
                     <Pressable style={styles.secondaryBtn}>
-                      <ThemedText type="smallBold">Donation records & pickup QR</ThemedText>
+                      <ThemedText type="smallBold" style={styles.accountActionText}>Donation records & pickup QR</ThemedText>
                     </Pressable>
                   </Link>
                 ) : null}
                 {session.user.role === 'organization' ? (
                   <Link href="/donation-inbox" asChild>
                     <Pressable style={styles.secondaryBtn}>
-                      <ThemedText type="smallBold">Donation inbox & pickup QR scanner</ThemedText>
+                      <ThemedText type="smallBold" style={styles.accountActionText}>Donation inbox & pickup QR scanner</ThemedText>
                     </Pressable>
                   </Link>
                 ) : null}
@@ -419,19 +419,7 @@ export default function HomeScreen() {
                   ))
                 )}
               </ThemedView>
-              ) : (
-                <ThemedView type="backgroundElement" style={styles.panel}>
-                  <ThemedText type="smallBold">Find available resources</ThemedText>
-                  <ThemedText type="small" style={styles.helperText}>
-                    Browse offers from businesses and accept or decline the listings that match your nonprofit&apos;s needs.
-                  </ThemedText>
-                  <Link href="/explore" asChild>
-                    <Pressable style={styles.primaryBtn}>
-                      <ThemedText type="smallBold">Browse business listings</ThemedText>
-                    </Pressable>
-                  </Link>
-                </ThemedView>
-              )}
+              ) : null}
 
               <ThemedView type="backgroundElement" style={styles.panel}>
                 <ThemedText type="smallBold">Donation impact summary</ThemedText>
@@ -598,6 +586,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   panel: {
+    width: '100%',
     borderRadius: Spacing.four,
     paddingHorizontal: Spacing.four,
     paddingVertical: Spacing.three,
@@ -609,6 +598,13 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
+  },
+  accountActionPanel: {
+    alignItems: 'stretch',
+  },
+  accountActionText: {
+    width: '100%',
+    textAlign: 'center',
   },
   authPanel: {
     backgroundColor: '#FFFFFF',

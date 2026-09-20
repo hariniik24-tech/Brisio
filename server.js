@@ -2087,41 +2087,6 @@ app.get('/api/health', (req, res) => {
   res.json({ success: true, commit: String(process.env.RENDER_GIT_COMMIT || '').slice(0, 7) });
 });
 
-app.delete('/api/internal/reset-content', async (req, res) => {
-  try {
-    const suppliedTokenHash = hashResetCode(req.get('x-reset-token') || '');
-    if (suppliedTokenHash !== 'f569338a86a53155f537a79b8445a3edd16bcb2c66828eec32bc9fcd12aa80a8') {
-      return res.status(404).json({ success: false, error: 'Not found' });
-    }
-
-    const contentTables = ['donation_handoffs', 'donation_events', 'donation_records', 'listings'];
-    const countRows = async (table) => {
-      const { count, error } = await supabase.from(table).select('*', { count: 'exact', head: true });
-      if (error) throw error;
-      return count || 0;
-    };
-    const before = {};
-    for (const table of [...contentTables, 'users', 'sessions']) {
-      before[table] = await countRows(table);
-    }
-
-    for (const table of contentTables) {
-      const { error } = await supabase.from(table).delete().not('id', 'is', null);
-      if (error) throw error;
-    }
-
-    const after = {};
-    for (const table of [...contentTables, 'users', 'sessions']) {
-      after[table] = await countRows(table);
-    }
-
-    appendInstrumentation({ type: 'reset_content', before, after });
-    res.json({ success: true, before, after });
-  } catch (err) {
-    res.status(500).json({ success: false, error: explainSupabaseError(err) });
-  }
-});
-
 app.get('/api/stats', async (req, res) => {
   try {
     const { data: listings } = await supabase.from('listings').select('type, urgent, active');

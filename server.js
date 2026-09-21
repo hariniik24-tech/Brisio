@@ -1347,6 +1347,10 @@ app.get('/support', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'support.html'));
 });
 
+app.get('/privacy-policy', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'privacy-policy.html'));
+});
+
 const limiter = rateLimit({ windowMs: 60_000, max: 120, message: { error: 'Too many requests, slow down.' } });
 app.use('/api/', limiter);
 

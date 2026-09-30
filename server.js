@@ -65,7 +65,7 @@ let resetMailer = null;
 
 function explainSupabaseError(error) {
   const message = String(error?.message || error || 'Unknown Supabase error');
-  if (/fetch failed|network request failed|getaddrinfo|enotfound/i.test(message)) {
+  if (/fetch failed|network request failed|getaddrinfo|enotfound|web server is down|error code 52\d|<!doctype html>/i.test(message)) {
     return 'Database service is temporarily unavailable. Please try again shortly.';
   }
   if (message.includes("Could not find the table 'public.users' in the schema cache")) {
@@ -2089,6 +2089,14 @@ app.get('/api/match/:query', async (req, res, next) => {
 // Statistics Endpoints
 app.get('/api/health', (req, res) => {
   res.json({ success: true, commit: String(process.env.RENDER_GIT_COMMIT || '').slice(0, 7) });
+});
+
+app.get('/api/health/database', async (req, res) => {
+  const { error } = await supabase.from('users').select('id').limit(1);
+  if (error) {
+    return res.status(503).json({ success: false, error: explainSupabaseError(error) });
+  }
+  res.json({ success: true });
 });
 
 app.get('/api/stats', async (req, res) => {

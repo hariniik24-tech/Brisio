@@ -478,6 +478,11 @@ export default function HomeScreen() {
               <Pressable style={styles.secondaryBtn} onPress={session.signOut}>
                 <ThemedText type="smallBold">Sign out</ThemedText>
               </Pressable>
+              <Link href="/delete-account" asChild>
+                <Pressable style={styles.deleteAccountBtn}>
+                  <ThemedText type="smallBold" style={styles.deleteAccountText}>Delete account</ThemedText>
+                </Pressable>
+              </Link>
             </>
           )}
 
@@ -549,6 +554,17 @@ const styles = StyleSheet.create({
     left: 40,
     bottom: -170,
     backgroundColor: '#E2F2EA',
+  },
+  deleteAccountBtn: {
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#CF807A',
+    borderRadius: Spacing.four,
+    paddingVertical: Spacing.two,
+    backgroundColor: '#F9E5E3',
+  },
+  deleteAccountText: {
+    color: '#8F2924',
   },
   heroSection: {
     gap: Spacing.one,

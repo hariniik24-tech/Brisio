@@ -1662,30 +1662,45 @@ app.delete('/api/auth/account', async (req, res, next) => {
 
     const userId = req.user.id;
 
-    const [{ data: createdDonations }, { data: receivedDonations }] = await Promise.all([
+    async function deleteRows(query) {
+      const { error } = await query;
+      if (error) throw error;
+    }
+
+    const [createdResult, receivedResult] = await Promise.all([
       supabase.from('donation_records').select('id').eq('createdByUserId', userId),
       supabase.from('donation_records').select('id').eq('recipientOrgId', userId),
     ]);
+    if (createdResult.error || receivedResult.error) {
+      throw createdResult.error || receivedResult.error;
+    }
     const donationIds = [...new Set(
-      [...(createdDonations || []), ...(receivedDonations || [])]
+      [...(createdResult.data || []), ...(receivedResult.data || [])]
         .map((donation) => donation.id)
         .filter(Boolean)
     )];
+
+    await deleteRows(supabase.from('donation_handoffs').delete().eq('generatedByUserId', userId));
+    await deleteRows(supabase.from('donation_handoffs').delete().eq('receivedByUserId', userId));
+    await deleteRows(supabase.from('donation_events').delete().eq('actorUserId', userId));
     if (donationIds.length > 0) {
-      await supabase.from('donation_handoffs').delete().in('donationId', donationIds);
-      await supabase.from('donation_events').delete().in('donationId', donationIds);
-      await supabase.from('donation_records').delete().in('id', donationIds);
+      await deleteRows(supabase.from('donation_handoffs').delete().in('donationId', donationIds));
+      await deleteRows(supabase.from('donation_events').delete().in('donationId', donationIds));
+      await deleteRows(supabase.from('donation_records').delete().in('id', donationIds));
     }
 
-    await supabase.from('sessions').delete().eq('userId', userId);
-    await supabase.from('listings').delete().eq('ownerUserId', userId);
-    await supabase.from('users').delete().eq('id', userId);
+    await deleteRows(supabase.from('blocks').delete().eq('blockerUserId', userId));
+    await deleteRows(supabase.from('blocks').delete().eq('blockedUserId', userId));
+    await deleteRows(supabase.from('password_reset_tokens').delete().eq('userId', userId));
+    await deleteRows(supabase.from('sessions').delete().eq('userId', userId));
+    await deleteRows(supabase.from('listings').delete().eq('ownerUserId', userId));
+    await deleteRows(supabase.from('users').delete().eq('id', userId));
 
     appendInstrumentation({ type: 'delete_account', userId });
     res.json({ success: true });
   } catch (err) {
     console.error('Delete account error:', err);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: explainSupabaseError(err) });
   }
 });
 

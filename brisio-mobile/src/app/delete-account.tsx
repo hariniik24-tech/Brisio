@@ -27,7 +27,7 @@ export default function DeleteAccountScreen() {
     try {
       await deleteUserAccount(session.token);
       await session.signOut();
-      setMessage('Your account was deleted.');
+      router.replace('/');
     } catch (err) {
       setMessage(err instanceof Error ? err.message : 'Could not delete the account.');
     } finally {

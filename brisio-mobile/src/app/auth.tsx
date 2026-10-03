@@ -36,6 +36,7 @@ export default function AuthScreen() {
   const [mode, setMode] = useState<AuthMode>(() => (modeParam === 'login' ? 'login' : 'register'));
   const [email, setEmail] = useState(() => emailParam || '');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<'business' | 'organization'>('business');
   const [organizationName, setOrganizationName] = useState('');
@@ -74,6 +75,11 @@ export default function AuthScreen() {
       return;
     }
 
+    if (!phone.trim()) {
+      setFormError('Phone number is required.');
+      return;
+    }
+
     if (!acceptedTerms) {
       setFormError('Please accept the Privacy Policy and Terms to continue.');
       return;
@@ -95,6 +101,7 @@ export default function AuthScreen() {
     await session.signUp({
       email: trimmedEmail,
       password,
+      phone: phone.trim(),
       role,
       name: name.trim(),
       organizationName: organizationName.trim(),
@@ -179,6 +186,17 @@ export default function AuthScreen() {
             placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
             value={name}
             onChangeText={setName}
+          />
+
+          <ThemedText type="small" style={styles.inputLabel}>Phone number</ThemedText>
+          <TextInput
+            style={styles.input}
+            placeholder="(555) 123-4567"
+            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+            keyboardType="phone-pad"
+            textContentType="telephoneNumber"
+            value={phone}
+            onChangeText={setPhone}
           />
 
           <ThemedText type="small" style={styles.inputLabel}>Organization name</ThemedText>

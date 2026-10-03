@@ -20,7 +20,7 @@ export default function CreateListingScreen() {
   const submittingRef = useRef(false);
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
-  const [contact, setContact] = useState('');
+  const [contact, setContact] = useState(session.user?.phone || session.user?.email || '');
   const [deliveryTiming, setDeliveryTiming] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -139,7 +139,7 @@ export default function CreateListingScreen() {
       />
 
       <ThemedText type="small" style={styles.helperText}>
-        Your business name and account address will be added automatically.
+        Your business name, account address, and phone number are added automatically.
       </ThemedText>
 
       {!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}

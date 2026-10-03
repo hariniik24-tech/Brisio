@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
+  phone TEXT NOT NULL DEFAULT '',
   passwordHash TEXT NOT NULL,
   role TEXT NOT NULL CHECK(role IN ('business','organization','admin')),
   displayName TEXT NOT NULL,
@@ -69,6 +70,8 @@ CREATE TABLE IF NOT EXISTS users (
   location TEXT DEFAULT '',
   createdAt TEXT NOT NULL
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT '';
 
 -- Create sessions table
 CREATE TABLE IF NOT EXISTS sessions (

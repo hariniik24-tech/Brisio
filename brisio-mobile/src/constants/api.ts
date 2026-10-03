@@ -3,6 +3,7 @@ import { API_BASE_URL } from '@/constants/config';
 export type ApiUser = {
   id: string;
   email: string;
+  phone: string;
   role: 'business' | 'organization';
   displayName: string;
   organizationName: string;
@@ -186,6 +187,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 export async function registerUser(input: {
   email: string;
   password: string;
+  phone: string;
   role: 'business' | 'organization';
   name: string;
   organizationName: string;

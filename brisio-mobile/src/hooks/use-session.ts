@@ -8,6 +8,7 @@ const TOKEN_KEY = 'brisio-auth-token';
 type RegisterInput = {
   email: string;
   password: string;
+  phone: string;
   role: 'business' | 'organization';
   name: string;
   organizationName: string;

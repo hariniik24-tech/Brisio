@@ -566,6 +566,7 @@ function normalizeUserRow(row) {
   return {
     id: getFirstDefined(row, ['id']),
     email: getFirstDefined(row, ['email']),
+    phone: getFirstDefined(row, ['phone']) || '',
     role: getFirstDefined(row, ['role']),
     displayName: getFirstDefined(row, ['displayName', 'displayname']),
     organizationName: getFirstDefined(row, ['organizationName', 'organizationname']),
@@ -1365,7 +1366,8 @@ app.use((req, res, next) => {
 // Auth Endpoints
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password, role, name, organizationName, location } = req.body;
+    const { email, password, role, name, organizationName, location, phone } = req.body;
+    const normalizedPhone = String(phone || '').trim();
     if (!email || !password || !role || !name) {
       return res.status(400).json({ success: false, error: 'email, password, role, and name are required' });
     }
@@ -1395,6 +1397,7 @@ app.post('/api/auth/register', async (req, res) => {
     const { error } = await supabase.from('users').insert([{
       id: userId,
       email,
+      phone: normalizedPhone,
       passwordHash,
       passwordhash: passwordHash,
       role,
@@ -1419,6 +1422,7 @@ app.post('/api/auth/register', async (req, res) => {
       user: {
         id: userId,
         email,
+        phone: normalizedPhone,
         role,
         displayName: name,
         organizationName: organizationName || '',
@@ -1635,7 +1639,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     const token = await issueSession(normalizedUser.id);
     appendInstrumentation({ type: 'login', userId: normalizedUser.id, email });
-    res.json({ success: true, token, user: { id: normalizedUser.id, email: normalizedUser.email, role: normalizedUser.role, displayName: normalizedUser.displayName, organizationName: normalizedUser.organizationName, location: normalizedUser.location, createdAt: normalizedUser.createdAt } });
+    res.json({ success: true, token, user: { id: normalizedUser.id, email: normalizedUser.email, phone: normalizedUser.phone, role: normalizedUser.role, displayName: normalizedUser.displayName, organizationName: normalizedUser.organizationName, location: normalizedUser.location, createdAt: normalizedUser.createdAt } });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ success: false, error: err.message });
@@ -2208,9 +2212,45 @@ app.get('/api/donation-recipients', async (req, res) => {
       return res.status(403).json({ success: false, error: 'Only business users can select donation recipients.' });
     }
 
+    const { data: acceptedEvents, error: eventError } = await supabase
+      .from('donation_events')
+      .select('donationId, payloadJson')
+      .eq('eventType', 'accepted')
+      .eq('actorRole', 'organization');
+    if (eventError) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(eventError) });
+    }
+
+    const listingResponseIds = (acceptedEvents || [])
+      .filter((row) => Boolean(parseJsonSafe(getFirstDefined(row, ['payloadJson', 'payloadjson'])).sourceListingId))
+      .map((row) => String(getFirstDefined(row, ['donationId', 'donationid']) || ''))
+      .filter(Boolean);
+    if (listingResponseIds.length === 0) {
+      return res.json({ success: true, organizations: [] });
+    }
+
+    const { data: acceptedRecords, error: acceptedError } = await supabase
+      .from('donation_records')
+      .select('recipientOrgId')
+      .in('id', listingResponseIds)
+      .eq('donorOrgId', req.user.id);
+    if (acceptedError) {
+      return res.status(500).json({ success: false, error: explainSupabaseError(acceptedError) });
+    }
+
+    const recipientIds = [...new Set(
+      (acceptedRecords || [])
+        .map((row) => String(getFirstDefined(row, ['recipientOrgId', 'recipientorgid']) || ''))
+        .filter(Boolean)
+    )];
+    if (recipientIds.length === 0) {
+      return res.json({ success: true, organizations: [] });
+    }
+
     const { data, error } = await supabase
       .from('users')
       .select('*')
+      .in('id', recipientIds)
       .eq('role', 'organization')
       .limit(200);
     if (error) return res.status(500).json({ success: false, error: explainSupabaseError(error) });

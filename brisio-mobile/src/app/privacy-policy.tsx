@@ -6,6 +6,13 @@ import { ThemedText } from '@/components/themed-text';
 
 export default function PrivacyPolicyScreen() {
   const router = useRouter();
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/');
+  };
   const policyText = `Brisio Privacy Policy
 Effective Date: August 11, 2026
 Last Updated: August 11, 2026
@@ -206,8 +213,8 @@ Last Updated: August 11, 2026`;
 
   return (
     <StackScreenShell>
-        <Pressable onPress={() => router.push('/')} style={styles.backBtn} hitSlop={10}>
-          <ThemedText type="smallBold">Back to Home</ThemedText>
+        <Pressable onPress={goBack} style={styles.backBtn} hitSlop={10}>
+          <ThemedText type="smallBold">Back</ThemedText>
         </Pressable>
         <ThemedText type="subtitle">Privacy Policy</ThemedText>
         <ThemedText type="small" style={styles.bodyText}>{policyText}</ThemedText>

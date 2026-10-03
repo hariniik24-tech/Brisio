@@ -6,6 +6,13 @@ import { ThemedText } from '@/components/themed-text';
 
 export default function TermsScreen() {
   const router = useRouter();
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace('/');
+  };
   const termsText = `Brisio Terms and Conditions
 Effective Date: August 11, 2026
 Last Updated: August 11, 2026
@@ -265,8 +272,8 @@ Last Updated: August 11, 2026`;
 
   return (
     <StackScreenShell>
-        <Pressable onPress={() => router.push('/')} style={styles.backBtn} hitSlop={10}>
-          <ThemedText type="smallBold">Back to Home</ThemedText>
+        <Pressable onPress={goBack} style={styles.backBtn} hitSlop={10}>
+          <ThemedText type="smallBold">Back</ThemedText>
         </Pressable>
         <ThemedText type="subtitle">Terms and Conditions</ThemedText>
         <ThemedText type="small" style={styles.bodyText}>{termsText}</ThemedText>

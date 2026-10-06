@@ -111,7 +111,7 @@ export default function CreateListingScreen() {
       <TextInput
         accessibilityLabel="Listing description"
         style={[styles.input, styles.multilineInput]}
-        placeholder="Describe the goods or resources available to nonprofit partners"
+        placeholder="Example: 20 sealed cases of canned vegetables, available for pickup through Friday"
         placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
         multiline
         value={description}

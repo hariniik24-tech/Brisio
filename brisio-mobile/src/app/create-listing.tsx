@@ -107,11 +107,11 @@ export default function CreateListingScreen() {
         onChangeText={(value) => setCategory(capitalizeWords(value))}
       />
 
-      <ThemedText type="smallBold">What are you giving?</ThemedText>
+      <ThemedText type="smallBold">Donation details</ThemedText>
       <TextInput
         accessibilityLabel="Listing description"
         style={[styles.input, styles.multilineInput]}
-        placeholder="Describe what you are giving to the nonprofit"
+        placeholder="Describe the goods or resources available to nonprofit partners"
         placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
         multiline
         value={description}

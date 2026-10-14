@@ -12,9 +12,6 @@ import { Link, useRouter } from 'expo-router';
 
 const INPUT_PLACEHOLDER_COLOR = '#6A7685';
 
-function capitalizeWords(value: string) {
-  return value.replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
-}
 const DONATION_SUMMARY_FALLBACK_MESSAGE = 'Donation metrics are temporarily unavailable. Please refresh shortly.';
 
 type DonationSummary = {
@@ -169,8 +166,8 @@ export default function HomeScreen() {
 
   async function saveListingEdits() {
     if (!session.token || !editingListingId || listingUpdating) return;
-    if (!editForm.category.trim() || !editForm.description.trim()) {
-      setFormError('Category and description are required.');
+    if (!editForm.description.trim()) {
+      setFormError('Donation details are required.');
       return;
     }
 
@@ -292,30 +289,32 @@ export default function HomeScreen() {
                 ) : null}
               </ThemedView>
 
-              <ThemedView type="backgroundElement" style={styles.panel}>
-                <ThemedText type="smallBold">AI assistant</ThemedText>
-                <ThemedText type="small" style={styles.helperText}>
-                  Ask for recommendations based on current listings.
-                </ThemedText>
-                <TextInput
-                  style={[styles.input, styles.multilineInput]}
-                  placeholder="Ask AI where to help next or what to request first"
-                  placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-                  multiline
-                  value={aiPrompt}
-                  onChangeText={setAiPrompt}
-                />
-                <Pressable style={styles.primaryBtn} onPress={runAiAssistant}>
-                  <ThemedText type="smallBold">{aiBusy ? 'Analyzing...' : 'Get AI recommendation'}</ThemedText>
-                </Pressable>
-                {!!aiSummary && <ThemedText type="small">{aiSummary}</ThemedText>}
-                {aiActions.map((item) => (
-                  <ThemedText key={item} type="small" style={styles.helperText}>
-                    • {item}
+              {session.user.role === 'organization' ? (
+                <ThemedView type="backgroundElement" style={styles.panel}>
+                  <ThemedText type="smallBold">AI assistant</ThemedText>
+                  <ThemedText type="small" style={styles.helperText}>
+                    Ask for recommendations based on current listings.
                   </ThemedText>
-                ))}
-                {!!aiError && <ThemedText style={styles.errorText}>{aiError}</ThemedText>}
-              </ThemedView>
+                  <TextInput
+                    style={[styles.input, styles.multilineInput]}
+                    placeholder="Ask AI where to help next or what to request first"
+                    placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+                    multiline
+                    value={aiPrompt}
+                    onChangeText={setAiPrompt}
+                  />
+                  <Pressable style={styles.primaryBtn} onPress={runAiAssistant}>
+                    <ThemedText type="smallBold">{aiBusy ? 'Analyzing...' : 'Get AI recommendation'}</ThemedText>
+                  </Pressable>
+                  {!!aiSummary && <ThemedText type="small">{aiSummary}</ThemedText>}
+                  {aiActions.map((item) => (
+                    <ThemedText key={item} type="small" style={styles.helperText}>
+                      • {item}
+                    </ThemedText>
+                  ))}
+                  {!!aiError && <ThemedText style={styles.errorText}>{aiError}</ThemedText>}
+                </ThemedView>
+              ) : null}
 
               {session.user.role === 'business' ? (
               <ThemedView type="backgroundElement" style={styles.panel}>
@@ -339,15 +338,6 @@ export default function HomeScreen() {
                     <ThemedView key={item.id} style={styles.listingItem}>
                       {editingListingId === item.id ? (
                         <>
-                          <TextInput
-                            accessibilityLabel="Listing category"
-                            style={styles.input}
-                            placeholder="Category"
-                            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-                            autoCapitalize="words"
-                            value={editForm.category}
-                            onChangeText={(value) => setEditForm((previous) => ({ ...previous, category: capitalizeWords(value) }))}
-                          />
                           <TextInput
                             accessibilityLabel="Listing description"
                             style={[styles.input, styles.multilineInput]}
@@ -386,7 +376,7 @@ export default function HomeScreen() {
                         </>
                       ) : (
                         <>
-                          <ThemedText type="smallBold" style={styles.categoryText}>{item.category}</ThemedText>
+                          <ThemedText type="smallBold">Donation offer</ThemedText>
                           <ThemedText type="small">Business: {item.businessName}</ThemedText>
                           <ThemedText type="small">
                             {item.type === 'supply' ? 'Available resource' : 'Resource request'}
@@ -777,9 +767,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.two,
     marginTop: Spacing.one,
-  },
-  categoryText: {
-    textTransform: 'capitalize',
   },
   listingActionBtn: {
     flex: 1,

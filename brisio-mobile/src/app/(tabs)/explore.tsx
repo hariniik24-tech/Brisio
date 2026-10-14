@@ -136,7 +136,7 @@ function ExploreContent() {
               <ThemedText type="smallBold">Search listings</ThemedText>
               <TextInput
                 style={[styles.input, { color: theme.text }]}
-                placeholder="Category, description, or location"
+                placeholder="Donation, business, or location"
                 placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
                 value={query}
                 onChangeText={setQuery}
@@ -170,10 +170,6 @@ function ExploreContent() {
                 filtered.slice(0, 25).map((item) => (
                   <ThemedView key={item.id} type="backgroundElement" style={styles.listingCard}>
                     <ThemedText type="smallBold">Offered by {item.businessName}</ThemedText>
-                    <ThemedText type="small">
-                      Available resource |{' '}
-                      <ThemedText type="small" style={styles.categoryText}>{item.category}</ThemedText>
-                    </ThemedText>
                     <ThemedText type="small">{item.description}</ThemedText>
                     {!!item.availabilityNotes && <ThemedText type="small">Timing: {item.availabilityNotes}</ThemedText>}
                     <ThemedText type="small">Address: {item.location || 'Address not set'}</ThemedText>

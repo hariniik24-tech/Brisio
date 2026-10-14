@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Pressable, Share, StyleSheet, TextInput, View } from 'react-native';
-import { Href, useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import QRCode from 'react-native-qrcode-svg';
 
 import { StackScreenShell } from '@/components/stack-screen-shell';
@@ -237,11 +237,8 @@ export default function DonateInventoryScreen() {
       <View style={styles.headingRow}>
         <View style={styles.headingText}>
           <ThemedText type="subtitle">My donation records</ThemedText>
-          <ThemedText type="small" style={styles.helperText}>Only records created by this account appear here.</ThemedText>
+          <ThemedText type="small" style={styles.helperText}>Accepted listings appear here automatically.</ThemedText>
         </View>
-        <Pressable style={styles.createBtn} onPress={() => router.push('/create-donation-record' as Href)}>
-          <ThemedText type="smallBold">Create record</ThemedText>
-        </Pressable>
       </View>
 
       <View style={styles.summaryCard}>
@@ -273,10 +270,7 @@ export default function DonateInventoryScreen() {
       ) : records.length === 0 ? (
         <View style={styles.emptyCard}>
           <ThemedText type="smallBold">No donation records yet</ThemedText>
-          <ThemedText type="small">Create your first record to scan an item and assign an eligible nonprofit.</ThemedText>
-          <Pressable style={styles.primaryBtn} onPress={() => router.push('/create-donation-record' as Href)}>
-            <ThemedText type="smallBold">Create donation record</ThemedText>
-          </Pressable>
+          <ThemedText type="small">A record will appear automatically after a nonprofit accepts one of your listings.</ThemedText>
         </View>
       ) : (
         records.map((record) => (

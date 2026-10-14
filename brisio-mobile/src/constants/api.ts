@@ -196,6 +196,7 @@ export async function registerUser(input: {
   return apiRequest<{ success: true; token: string; user: ApiUser }>('/api/auth/register', {
     method: 'POST',
     body: input,
+    timeoutMs: 60000,
   });
 }
 
@@ -203,6 +204,7 @@ export async function loginUser(input: { email: string; password: string }) {
   return apiRequest<{ success: true; token: string; user: ApiUser }>('/api/auth/login', {
     method: 'POST',
     body: input,
+    timeoutMs: 60000,
   });
 }
 

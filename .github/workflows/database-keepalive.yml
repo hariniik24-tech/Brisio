@@ -2,7 +2,7 @@ name: Database keepalive
 
 on:
   schedule:
-    - cron: '17 14 * * *'
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -11,6 +11,16 @@ permissions:
 jobs:
   ping-database:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Query production database
-        run: curl --fail --show-error --silent --retry 3 --retry-delay 10 https://brisio-api-gofb.onrender.com/api/health/database
+      - name: Keep production API and database warm
+        run: >-
+          curl
+          --fail
+          --show-error
+          --silent
+          --retry 5
+          --retry-all-errors
+          --retry-delay 10
+          --max-time 60
+          https://brisio-api-gofb.onrender.com/api/health/database

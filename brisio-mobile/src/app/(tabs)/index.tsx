@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { ApiListing, deleteListing, getDonationImpactSummary, getListings, updateListing } from '@/constants/api';
+import { ApiDonation, ApiListing, deleteListing, getDonationImpactSummary, getDonations, getListings, updateListing } from '@/constants/api';
 import { API_BASE_URL } from '@/constants/config';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
@@ -36,6 +36,8 @@ export default function HomeScreen() {
   const [donationSummaryLoading, setDonationSummaryLoading] = useState(false);
   const [donationSummaryError, setDonationSummaryError] = useState('');
   const [donationSummaryUpdatedAt, setDonationSummaryUpdatedAt] = useState('');
+  const [acceptedDonations, setAcceptedDonations] = useState<ApiDonation[]>([]);
+  const [acceptedDonationsLoading, setAcceptedDonationsLoading] = useState(false);
 
   const [deletingListingId, setDeletingListingId] = useState('');
   const [editingListingId, setEditingListingId] = useState('');
@@ -52,6 +54,11 @@ export default function HomeScreen() {
   const myListings = useMemo(
     () => listings.filter((listing) => listing.ownerUserId === session.user?.id),
     [listings, session.user?.id]
+  );
+
+  const latestAcceptedDonation = useMemo(
+    () => [...acceptedDonations].sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0],
+    [acceptedDonations]
   );
 
   async function loadListings() {
@@ -101,6 +108,28 @@ export default function HomeScreen() {
       isActive = false;
     };
   }, [session.isAuthenticated, session.token]);
+
+  useEffect(() => {
+    if (!session.isAuthenticated || !session.token || session.user?.role !== 'business') return;
+    let active = true;
+    const refreshAcceptedDonations = async () => {
+      setAcceptedDonationsLoading(true);
+      try {
+        const response = await getDonations(session.token!, 'accepted');
+        if (active) setAcceptedDonations(response.donations || []);
+      } catch {
+        if (active) setAcceptedDonations([]);
+      } finally {
+        if (active) setAcceptedDonationsLoading(false);
+      }
+    };
+    refreshAcceptedDonations();
+    const refreshInterval = setInterval(refreshAcceptedDonations, 30000);
+    return () => {
+      active = false;
+      clearInterval(refreshInterval);
+    };
+  }, [session.isAuthenticated, session.token, session.user?.role]);
 
   useEffect(() => {
     if (!session.isAuthenticated || !session.token) return;
@@ -272,6 +301,30 @@ export default function HomeScreen() {
             </ThemedView>
           ) : (
             <>
+              {session.user.role === 'business' && latestAcceptedDonation ? (
+                <ThemedView type="backgroundElement" style={[styles.panel, styles.acceptancePanel]}>
+                  <ThemedText type="smallBold" style={styles.acceptanceTitle}>Listing accepted</ThemedText>
+                  <ThemedText type="small">
+                    {latestAcceptedDonation.recipientName || 'A nonprofit'} accepted {latestAcceptedDonation.productName}.
+                  </ThemedText>
+                  <ThemedText type="small" style={styles.helperText}>
+                    Prepare the donation for pickup and show the one-time QR when they arrive.
+                  </ThemedText>
+                  <Link href="/donate-inventory" asChild>
+                    <Pressable style={styles.primaryBtn}>
+                      <ThemedText type="smallBold">Open pickup QR</ThemedText>
+                    </Pressable>
+                  </Link>
+                </ThemedView>
+              ) : null}
+
+              {session.user.role === 'business' && acceptedDonationsLoading && !latestAcceptedDonation ? (
+                <ThemedView type="backgroundElement" style={[styles.panel, styles.loadingRow]}>
+                  <ActivityIndicator size="small" />
+                  <ThemedText type="small">Checking for listing updates...</ThemedText>
+                </ThemedView>
+              ) : null}
+
               <ThemedView type="backgroundElement" style={[styles.panel, styles.accountActionPanel]}>
                 {session.user.role === 'business' ? (
                   <Link href="/donate-inventory" asChild>
@@ -607,6 +660,13 @@ const styles = StyleSheet.create({
   },
   accountActionPanel: {
     alignItems: 'stretch',
+  },
+  acceptancePanel: {
+    backgroundColor: '#EDF7F0',
+    borderColor: '#9BC5A8',
+  },
+  acceptanceTitle: {
+    color: '#256A4A',
   },
   accountActionText: {
     width: '100%',

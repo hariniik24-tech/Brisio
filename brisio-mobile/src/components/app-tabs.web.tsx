@@ -12,8 +12,11 @@ import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useSessionContext } from '@/context/session-context';
 
 export default function AppTabs() {
+  const session = useSessionContext();
+
   return (
     <Tabs>
       <TabSlot style={{ height: '100%' }} />
@@ -22,9 +25,11 @@ export default function AppTabs() {
           <TabTrigger name="home" href="/" asChild>
             <TabButton>Home</TabButton>
           </TabTrigger>
-          <TabTrigger name="explore" href="/explore" asChild>
-            <TabButton>Explore</TabButton>
-          </TabTrigger>
+          {session.user?.role !== 'business' ? (
+            <TabTrigger name="explore" href="/explore" asChild>
+              <TabButton>Explore</TabButton>
+            </TabTrigger>
+          ) : null}
         </CustomTabList>
       </TabList>
     </Tabs>

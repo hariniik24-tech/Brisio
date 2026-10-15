@@ -14,6 +14,16 @@ function capitalizeWords(value: string) {
   return value.replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
 }
 
+function parseDonationDetails(description: string) {
+  const match = description.trim().match(/^(\d+(?:\.\d+)?)\s+([^\s]+)\s+(?:of\s+)?(.+)$/i);
+  if (!match) return {};
+  return {
+    quantity: match[1],
+    resourceType: match[2],
+    resourceName: match[3],
+  };
+}
+
 export default function CreateListingScreen() {
   const router = useRouter();
   const session = useSessionContext();
@@ -36,11 +46,13 @@ export default function CreateListingScreen() {
     setBusy(true);
     setError('');
     try {
+      const donationDetails = parseDonationDetails(description);
       await createListing(session.token, {
         category: category.trim().toLowerCase(),
         description: description.trim(),
         contact: contact.trim(),
         location: session.user.location,
+        ...donationDetails,
         ...(deliveryTiming.trim() ? { availabilityNotes: deliveryTiming.trim() } : {}),
       });
       router.replace('/');

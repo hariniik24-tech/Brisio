@@ -71,6 +71,7 @@ ensureColumn('listings', 'targetOrganizationId', 'TEXT DEFAULT \'\'');
 ensureColumn('listings', 'resourceName', 'TEXT DEFAULT \'\'');
 ensureColumn('listings', 'resourceType', 'TEXT DEFAULT \'\'');
 ensureColumn('listings', 'quantity', 'TEXT DEFAULT \'\'');
+ensureColumn('listings', 'estimatedUnitValue', 'REAL');
 ensureColumn('listings', 'availabilityNotes', 'TEXT DEFAULT \'\'');
 
 const existingCount = db.prepare('SELECT COUNT(*) AS c FROM listings').get().c;
@@ -900,6 +901,7 @@ app.post('/api/listings', requireAuth, (req, res) => {
     resourceName,
     resourceType,
     quantity,
+    estimatedUnitValue,
     availabilityNotes,
     deliverWithinHours,
     offerClosesAt,
@@ -955,6 +957,12 @@ app.post('/api/listings', requireAuth, (req, res) => {
   const normalizedDescription = String(description).trim();
   const normalizedContact = String(contact || '').trim();
   const normalizedAvailabilityNotes = String(availabilityNotes || '').trim();
+  const normalizedEstimatedUnitValue = estimatedUnitValue === '' || estimatedUnitValue === null || estimatedUnitValue === undefined
+    ? null
+    : Number(estimatedUnitValue);
+  if (normalizedEstimatedUnitValue !== null && (!Number.isFinite(normalizedEstimatedUnitValue) || normalizedEstimatedUnitValue < 0)) {
+    return res.status(400).json({ success: false, error: 'estimatedUnitValue must be a nonnegative number' });
+  }
   const duplicate = db.prepare(`
     SELECT id FROM listings
     WHERE ownerUserId = ? AND category = ? AND description = ? AND contact = ?
@@ -980,9 +988,9 @@ app.post('/api/listings', requireAuth, (req, res) => {
     INSERT INTO listings (
       id, type, category, businessName, description, contact, location, urgent, active, createdAt, updatedAt,
       ownerUserId, deliverWithinHours, offerClosesAt, urgencyLevel, isPrivate, targetOrganizationId,
-      resourceName, resourceType, quantity, availabilityNotes
+      resourceName, resourceType, quantity, estimatedUnitValue, availabilityNotes
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     type,
@@ -1003,6 +1011,7 @@ app.post('/api/listings', requireAuth, (req, res) => {
     String(resourceName || '').trim(),
     String(resourceType || '').trim(),
     String(quantity || '').trim(),
+    normalizedEstimatedUnitValue,
     normalizedAvailabilityNotes
   );
 

@@ -289,6 +289,7 @@ export async function createListing(
     resourceName?: string;
     resourceType?: string;
     quantity?: string;
+    estimatedUnitValue?: number;
     urgencyLevel?: 'low' | 'medium' | 'high' | 'critical';
     deliverWithinHours?: string;
     availabilityNotes?: string;

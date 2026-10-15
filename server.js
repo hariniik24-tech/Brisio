@@ -597,6 +597,7 @@ function normalizeListingRow(row) {
     urgencyLevel: getFirstDefined(row, ['urgencyLevel', 'urgencylevel']) || 'normal',
     resourceName: getFirstDefined(row, ['resourceName', 'resourcename']) || '',
     resourceType: getFirstDefined(row, ['resourceType', 'resourcetype']) || '',
+    estimatedUnitValue: getFirstDefined(row, ['estimatedUnitValue', 'estimatedunitvalue']),
     availabilityNotes: getFirstDefined(row, ['availabilityNotes', 'availabilitynotes']) || '',
     isPrivate: Number(getFirstDefined(row, ['isPrivate', 'isprivate']) || 0),
     targetOrganizationId: getFirstDefined(row, ['targetOrganizationId', 'targetorganizationid']) || '',
@@ -1753,7 +1754,7 @@ app.post('/api/listings', async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'Only business accounts can create listings.' });
     }
 
-    const { category, description, contact, urgent, deliverWithinHours, offerClosesAt, urgencyLevel, resourceName, resourceType, quantity, availabilityNotes, isPrivate, targetOrganizationId } = req.body;
+    const { category, description, contact, urgent, deliverWithinHours, offerClosesAt, urgencyLevel, resourceName, resourceType, quantity, estimatedUnitValue, availabilityNotes, isPrivate, targetOrganizationId } = req.body;
     const type = 'supply';
     const businessName = req.user.organizationName || req.user.displayName;
     const location = String(req.user.location || '').trim();
@@ -1767,6 +1768,12 @@ app.post('/api/listings', async (req, res, next) => {
     const detectedCategory = String(category || detectCategory(normalizedDescription)).trim();
     const normalizedContact = String(contact || '').trim();
     const normalizedAvailabilityNotes = String(availabilityNotes || '').trim();
+    const normalizedEstimatedUnitValue = estimatedUnitValue === '' || estimatedUnitValue === null || estimatedUnitValue === undefined
+      ? null
+      : Number(estimatedUnitValue);
+    if (normalizedEstimatedUnitValue !== null && (!Number.isFinite(normalizedEstimatedUnitValue) || normalizedEstimatedUnitValue < 0)) {
+      return res.status(400).json({ success: false, error: 'estimatedUnitValue must be a nonnegative number' });
+    }
     const duplicateCutoff = new Date(Date.now() - 60 * 1000).toISOString();
     const { data: recentListings } = await supabase
       .from('listings')
@@ -1811,6 +1818,8 @@ app.post('/api/listings', async (req, res, next) => {
       resourceType: resourceType || '',
       resourcetype: resourceType || '',
       quantity: quantity || '',
+      estimatedUnitValue: normalizedEstimatedUnitValue,
+      estimatedunitvalue: normalizedEstimatedUnitValue,
       availabilityNotes: normalizedAvailabilityNotes,
       availabilitynotes: normalizedAvailabilityNotes,
       isPrivate: isPrivate ? 1 : 0,
@@ -1880,6 +1889,9 @@ app.post('/api/listings/:id/respond', async (req, res) => {
     const quantity = Number.isFinite(listedQuantity) && listedQuantity > 0 ? listedQuantity : 1;
     const productName = String(listing.resourceName || listing.category || 'Listed resource').trim();
     const unit = String(listing.resourceType || 'listing').trim() || 'listing';
+    const listedUnitValue = Number(listing.estimatedUnitValue);
+    const estimatedUnitValue = Number.isFinite(listedUnitValue) && listedUnitValue >= 0 ? listedUnitValue : null;
+    const estimatedTotalValue = estimatedUnitValue === null ? null : Number((estimatedUnitValue * quantity).toFixed(2));
     const status = action === 'accept' ? 'accepted' : 'declined';
     const row = {
       id: donationId,
@@ -1900,10 +1912,10 @@ app.post('/api/listings/:id/respond', async (req, res) => {
       productcategory: listing.category || 'other',
       quantity,
       unit,
-      estimatedUnitValue: null,
-      estimatedunitvalue: null,
-      estimatedTotalValue: null,
-      estimatedtotalvalue: null,
+      estimatedUnitValue,
+      estimatedunitvalue: estimatedUnitValue,
+      estimatedTotalValue,
+      estimatedtotalvalue: estimatedTotalValue,
       currency: 'USD',
       conditionNotes: listing.description || '',
       conditionnotes: listing.description || '',

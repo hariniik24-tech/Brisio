@@ -21,10 +21,13 @@ CREATE TABLE IF NOT EXISTS listings (
   resourceName TEXT DEFAULT '',
   resourceType TEXT DEFAULT '',
   quantity TEXT DEFAULT '',
+  estimatedUnitValue NUMERIC,
   availabilityNotes TEXT DEFAULT '',
   createdAt TEXT NOT NULL,
   updatedAt TEXT NOT NULL
 );
+
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS "estimatedUnitValue" NUMERIC;
 
 -- Create reports table
 CREATE TABLE IF NOT EXISTS reports (

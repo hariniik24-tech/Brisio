@@ -1,89 +1,34 @@
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
-import { CameraView, useCameraPermissions, type BarcodeType } from 'expo-camera';
 
 import { StackScreenShell } from '@/components/stack-screen-shell';
 import { ThemedText } from '@/components/themed-text';
-import { createListing, lookupProductByBarcode } from '@/constants/api';
+import { createListing } from '@/constants/api';
 import { Spacing } from '@/constants/theme';
 import { useSessionContext } from '@/context/session-context';
 
 const INPUT_PLACEHOLDER_COLOR = '#6A7685';
-const RETAIL_BARCODE_TYPES: BarcodeType[] = ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128'];
 
-function inferDonationCategory(description: string) {
-  const normalized = description.toLowerCase();
-  if (/coca-cola|soda|drink|beverage|water|juice|coffee|tea/.test(normalized)) return 'beverages';
-  if (/food|meal|produce|vegetable|fruit|bread|grocery|canned/.test(normalized)) return 'food';
-  if (/equipment|tool|machine|device|computer|furniture/.test(normalized)) return 'equipment';
-  if (/space|room|office|venue|warehouse/.test(normalized)) return 'space';
-  if (/service|training|consulting|volunteer/.test(normalized)) return 'service';
-  return 'donation';
+function capitalizeWords(value: string) {
+  return value.replace(/(^|\s)\S/g, (letter) => letter.toUpperCase());
 }
 
 export default function CreateListingScreen() {
   const router = useRouter();
   const session = useSessionContext();
   const submittingRef = useRef(false);
-  const scanningRef = useRef(false);
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [scannerOpen, setScannerOpen] = useState(false);
-  const [barcode, setBarcode] = useState('');
-  const [lookupBusy, setLookupBusy] = useState(false);
+  const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [unit, setUnit] = useState('cases');
   const [contact, setContact] = useState(session.user?.phone || session.user?.email || '');
   const [deliveryTiming, setDeliveryTiming] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  async function identifyProduct(value: string) {
-    if (!session.token) return;
-    const cleanedBarcode = value.replace(/\D/g, '');
-    if (!cleanedBarcode) {
-      setError('Enter or scan a product barcode first.');
-      return;
-    }
-    setLookupBusy(true);
-    setError('');
-    try {
-      const response = await lookupProductByBarcode(session.token, { barcode: cleanedBarcode, format: 'upc-a' });
-      setBarcode(cleanedBarcode);
-      setDescription(response.product.name);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not identify that barcode.');
-    } finally {
-      setLookupBusy(false);
-    }
-  }
-
-  async function openScanner() {
-    if (!cameraPermission?.granted) {
-      const permission = await requestCameraPermission();
-      if (!permission.granted) {
-        setError('Camera permission is required to scan a product barcode. You can enter the UPC instead.');
-        return;
-      }
-    }
-    scanningRef.current = false;
-    setError('');
-    setScannerOpen(true);
-  }
-
-  async function handleBarcodeScanned({ data }: { data: string }) {
-    if (scanningRef.current) return;
-    scanningRef.current = true;
-    setScannerOpen(false);
-    await identifyProduct(data);
-  }
-
   async function submitListing() {
     if (!session.token || !session.user || submittingRef.current) return;
-    const parsedQuantity = Number(quantity);
-    if (!description.trim() || !Number.isFinite(parsedQuantity) || parsedQuantity <= 0 || !unit.trim()) {
-      setError('Product, quantity, and quantity type are required.');
+    if (!category.trim() || !description.trim()) {
+      setError('Category and description are required.');
       return;
     }
 
@@ -92,13 +37,10 @@ export default function CreateListingScreen() {
     setError('');
     try {
       await createListing(session.token, {
-        category: inferDonationCategory(description),
-        description: `${parsedQuantity} ${unit.trim()} of ${description.trim()}`,
+        category: category.trim().toLowerCase(),
+        description: description.trim(),
         contact: contact.trim(),
         location: session.user.location,
-        resourceName: description.trim(),
-        resourceType: unit.trim(),
-        quantity: String(parsedQuantity),
         ...(deliveryTiming.trim() ? { availabilityNotes: deliveryTiming.trim() } : {}),
       });
       router.replace('/');
@@ -154,73 +96,27 @@ export default function CreateListingScreen() {
       </ThemedText>
       <ThemedText type="small">Address: {session.user.location || 'No account address set'}</ThemedText>
 
-      {scannerOpen ? (
-        <View style={styles.scannerCard}>
-          <CameraView
-            style={styles.camera}
-            facing="back"
-            onBarcodeScanned={handleBarcodeScanned}
-            barcodeScannerSettings={{ barcodeTypes: RETAIL_BARCODE_TYPES }}
-          />
-          <ThemedText type="small" style={styles.scannerHelp}>Keep the whole product barcode visible.</ThemedText>
-          <Pressable style={styles.secondaryBtn} onPress={() => setScannerOpen(false)}>
-            <ThemedText type="smallBold">Cancel scan</ThemedText>
-          </Pressable>
-        </View>
-      ) : null}
-
-      <ThemedText type="smallBold">Product barcode (optional)</ThemedText>
+      <ThemedText type="smallBold">Category</ThemedText>
       <TextInput
+        accessibilityLabel="Listing category"
         style={styles.input}
-        value={barcode}
-        onChangeText={setBarcode}
-        keyboardType="number-pad"
-        placeholder="Example: 012345678905"
+        placeholder="Food, equipment, space, service..."
         placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
+        autoCapitalize="words"
+        value={category}
+        onChangeText={(value) => setCategory(capitalizeWords(value))}
       />
-      <View style={styles.actionRow}>
-        <Pressable style={[styles.secondaryBtn, styles.actionBtn]} onPress={openScanner} disabled={lookupBusy || busy}>
-          <ThemedText type="smallBold">Scan barcode</ThemedText>
-        </Pressable>
-        <Pressable style={[styles.secondaryBtn, styles.actionBtn]} onPress={() => identifyProduct(barcode)} disabled={lookupBusy || busy}>
-          {lookupBusy ? <ActivityIndicator size="small" /> : <ThemedText type="smallBold">Identify item</ThemedText>}
-        </Pressable>
-      </View>
 
       <ThemedText type="smallBold">Donation details</ThemedText>
       <TextInput
         accessibilityLabel="Listing description"
-        style={styles.input}
-        placeholder="Product or donation name"
+        style={[styles.input, styles.multilineInput]}
+        placeholder="Example: 20 sealed cases of assorted canned vegetables"
         placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
         multiline
         value={description}
         onChangeText={setDescription}
       />
-
-      <View style={styles.actionRow}>
-        <View style={styles.actionBtn}>
-          <ThemedText type="smallBold">Quantity</ThemedText>
-          <TextInput
-            style={styles.input}
-            value={quantity}
-            onChangeText={setQuantity}
-            keyboardType="decimal-pad"
-            placeholder="20"
-            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-          />
-        </View>
-        <View style={styles.actionBtn}>
-          <ThemedText type="smallBold">Quantity type</ThemedText>
-          <TextInput
-            style={styles.input}
-            value={unit}
-            onChangeText={setUnit}
-            placeholder="Cases"
-            placeholderTextColor={INPUT_PLACEHOLDER_COLOR}
-          />
-        </View>
-      </View>
 
       <ThemedText type="smallBold">Contact</ThemedText>
       <TextInput
@@ -280,39 +176,6 @@ const styles = StyleSheet.create({
   multilineInput: {
     minHeight: 120,
     textAlignVertical: 'top',
-  },
-  scannerCard: {
-    borderWidth: 1,
-    borderColor: '#C9D8EC',
-    borderRadius: Spacing.three,
-    overflow: 'hidden',
-    gap: Spacing.two,
-    paddingBottom: Spacing.two,
-    backgroundColor: '#F3F8FF',
-  },
-  camera: {
-    height: 320,
-    width: '100%',
-  },
-  scannerHelp: {
-    paddingHorizontal: Spacing.two,
-    color: '#3A4A60',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  actionBtn: {
-    flex: 1,
-  },
-  secondaryBtn: {
-    alignItems: 'center',
-    borderRadius: Spacing.three,
-    paddingVertical: Spacing.three,
-    paddingHorizontal: Spacing.two,
-    borderWidth: 1,
-    borderColor: '#CDD5E1',
-    backgroundColor: '#F7F9FC',
   },
   primaryBtn: {
     alignItems: 'center',

@@ -70,6 +70,9 @@ ensureColumn('listings', 'isPrivate', 'INTEGER DEFAULT 0');
 ensureColumn('listings', 'targetOrganizationId', 'TEXT DEFAULT \'\'');
 ensureColumn('listings', 'resourceName', 'TEXT DEFAULT \'\'');
 ensureColumn('listings', 'resourceType', 'TEXT DEFAULT \'\'');
+ensureColumn('listings', 'productBrand', 'TEXT DEFAULT \'\'');
+ensureColumn('listings', 'upc', 'TEXT DEFAULT \'\'');
+ensureColumn('listings', 'gtin', 'TEXT DEFAULT \'\'');
 ensureColumn('listings', 'quantity', 'TEXT DEFAULT \'\'');
 ensureColumn('listings', 'estimatedUnitValue', 'REAL');
 ensureColumn('listings', 'availabilityNotes', 'TEXT DEFAULT \'\'');
@@ -900,6 +903,9 @@ app.post('/api/listings', requireAuth, (req, res) => {
     location,
     resourceName,
     resourceType,
+    productBrand,
+    upc,
+    gtin,
     quantity,
     estimatedUnitValue,
     availabilityNotes,
@@ -988,9 +994,9 @@ app.post('/api/listings', requireAuth, (req, res) => {
     INSERT INTO listings (
       id, type, category, businessName, description, contact, location, urgent, active, createdAt, updatedAt,
       ownerUserId, deliverWithinHours, offerClosesAt, urgencyLevel, isPrivate, targetOrganizationId,
-      resourceName, resourceType, quantity, estimatedUnitValue, availabilityNotes
+      resourceName, resourceType, productBrand, upc, gtin, quantity, estimatedUnitValue, availabilityNotes
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id,
     type,
@@ -1010,6 +1016,9 @@ app.post('/api/listings', requireAuth, (req, res) => {
     privateFlag === 1 ? String(targetOrganizationId).trim() : '',
     String(resourceName || '').trim(),
     String(resourceType || '').trim(),
+    String(productBrand || '').trim(),
+    String(upc || '').trim(),
+    String(gtin || '').trim(),
     String(quantity || '').trim(),
     normalizedEstimatedUnitValue,
     normalizedAvailabilityNotes

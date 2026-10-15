@@ -597,6 +597,9 @@ function normalizeListingRow(row) {
     urgencyLevel: getFirstDefined(row, ['urgencyLevel', 'urgencylevel']) || 'normal',
     resourceName: getFirstDefined(row, ['resourceName', 'resourcename']) || '',
     resourceType: getFirstDefined(row, ['resourceType', 'resourcetype']) || '',
+    productBrand: getFirstDefined(row, ['productBrand', 'productbrand']) || '',
+    upc: getFirstDefined(row, ['upc']) || '',
+    gtin: getFirstDefined(row, ['gtin']) || '',
     estimatedUnitValue: getFirstDefined(row, ['estimatedUnitValue', 'estimatedunitvalue']),
     availabilityNotes: getFirstDefined(row, ['availabilityNotes', 'availabilitynotes']) || '',
     isPrivate: Number(getFirstDefined(row, ['isPrivate', 'isprivate']) || 0),
@@ -1754,7 +1757,7 @@ app.post('/api/listings', async (req, res, next) => {
       return res.status(403).json({ success: false, error: 'Only business accounts can create listings.' });
     }
 
-    const { category, description, contact, urgent, deliverWithinHours, offerClosesAt, urgencyLevel, resourceName, resourceType, quantity, estimatedUnitValue, availabilityNotes, isPrivate, targetOrganizationId } = req.body;
+    const { category, description, contact, urgent, deliverWithinHours, offerClosesAt, urgencyLevel, resourceName, resourceType, productBrand, upc, gtin, quantity, estimatedUnitValue, availabilityNotes, isPrivate, targetOrganizationId } = req.body;
     const type = 'supply';
     const businessName = req.user.organizationName || req.user.displayName;
     const location = String(req.user.location || '').trim();
@@ -1817,6 +1820,10 @@ app.post('/api/listings', async (req, res, next) => {
       resourcename: resourceName || '',
       resourceType: resourceType || '',
       resourcetype: resourceType || '',
+      productBrand: productBrand || '',
+      productbrand: productBrand || '',
+      upc: upc || '',
+      gtin: gtin || '',
       quantity: quantity || '',
       estimatedUnitValue: normalizedEstimatedUnitValue,
       estimatedunitvalue: normalizedEstimatedUnitValue,
@@ -1902,12 +1909,12 @@ app.post('/api/listings/:id/respond', async (req, res) => {
       recipientOrgId: req.user.id,
       recipientorgid: req.user.id,
       status,
-      gtin: '',
-      upc: '',
+      gtin: listing.gtin || '',
+      upc: listing.upc || '',
       productName,
       productname: productName,
-      productBrand: listing.businessName || '',
-      productbrand: listing.businessName || '',
+      productBrand: listing.productBrand || '',
+      productbrand: listing.productBrand || '',
       productCategory: listing.category || 'other',
       productcategory: listing.category || 'other',
       quantity,

@@ -117,6 +117,9 @@ export default function CreateListingScreen() {
         location: session.user.location,
         ...donationDetails,
         ...(identifiedProduct?.name ? { resourceName: identifiedProduct.name } : {}),
+        ...(identifiedProduct?.brand ? { productBrand: identifiedProduct.brand } : {}),
+        ...(identifiedProduct?.upc ? { upc: identifiedProduct.upc } : {}),
+        ...(identifiedProduct?.gtin ? { gtin: identifiedProduct.gtin } : {}),
         ...(parsedEstimatedUnitValue !== undefined ? { estimatedUnitValue: parsedEstimatedUnitValue } : {}),
         ...(deliveryTiming.trim() ? { availabilityNotes: deliveryTiming.trim() } : {}),
       });

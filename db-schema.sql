@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS listings (
   targetOrganizationId TEXT DEFAULT '',
   resourceName TEXT DEFAULT '',
   resourceType TEXT DEFAULT '',
+  productBrand TEXT DEFAULT '',
+  upc TEXT DEFAULT '',
+  gtin TEXT DEFAULT '',
   quantity TEXT DEFAULT '',
   estimatedUnitValue NUMERIC,
   availabilityNotes TEXT DEFAULT '',
@@ -28,6 +31,9 @@ CREATE TABLE IF NOT EXISTS listings (
 );
 
 ALTER TABLE listings ADD COLUMN IF NOT EXISTS "estimatedUnitValue" NUMERIC;
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS "productBrand" TEXT DEFAULT '';
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS upc TEXT DEFAULT '';
+ALTER TABLE listings ADD COLUMN IF NOT EXISTS gtin TEXT DEFAULT '';
 
 -- Create reports table
 CREATE TABLE IF NOT EXISTS reports (
